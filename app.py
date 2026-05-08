@@ -242,7 +242,7 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
 ---
 {name}现在问: {user_question}
 
-请倪师基于{name}的完整命盘，做一个深度的、全方位的解读。要具体、要敢说、要让人听完觉得"值了"。"}"""
+请倪师基于{name}的完整命盘，做一个深度的、全方位的解读。要具体、要敢说、要让人听完觉得'值了'。"""
 
     response = client.messages.create(
         model=API_MODEL,

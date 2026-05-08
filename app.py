@@ -19,6 +19,12 @@ from storage import save_user, save_chart_and_reading, save_chat, load_chat_hist
 BASE_DIR = Path(__file__).parent
 CALCULATOR = BASE_DIR / "chart_calculator.js"
 
+# Streamlit Cloud 自动装 Node.js 依赖
+import subprocess as _sp
+_node_modules = BASE_DIR / "node_modules" / "iztro"
+if not _node_modules.exists():
+    _sp.run(["npm", "install"], cwd=str(BASE_DIR), capture_output=True)
+
 # ================================================================
 # 配置
 # ================================================================

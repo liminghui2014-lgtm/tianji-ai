@@ -1,0 +1,8 @@
+node_modules/
+.jarvis_profile/
+tianji.db
+*.mp3
+__pycache__/
+*.pyc
+.env
+jarvis_live.html

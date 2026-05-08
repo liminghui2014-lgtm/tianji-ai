@@ -236,13 +236,13 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
 5. **结构**: 先给结论，再给论据（从命盘哪颗星哪个宫看出来的），最后给落地建议
 6. **不恐吓**: 如果看到不好的,用"留意""注意""多花时间在这块"的方式说，不吓人"""
 
-    messages = [{"role": "user", "content": f"""之前聊过的内容：
-{chat_history}
+    messages = [{"role": "user", "content": """之前聊过的内容：
+""" + str(chat_history) + """
 
 ---
-{name}现在问: {user_question}
+""" + str(name) + """现在问: """ + str(user_question) + """
 
-请倪师基于{name}的完整命盘，做一个深度的、全方位的解读。要具体、要敢说、要让人听完觉得'值了'。"""
+请倪师基于""" + str(name) + """的完整命盘，做一个深度的、全方位的解读。要具体、要敢说、要让人听完觉得值了。"""
 
     response = client.messages.create(
         model=API_MODEL,

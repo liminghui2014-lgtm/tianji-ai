@@ -223,5 +223,32 @@ def get_top_geju(limit=10):
     return counter.most_common(limit)
 
 
+# ═══════════════════════════════════════════════════════════════
+# 免费对话配额 (服务端强校验, 防止客户端绕过)
+# ═══════════════════════════════════════════════════════════════
+
+FREE_CHAT_LIMIT = 1  # 每人每个命盘免费对话次数
+
+def get_free_chats_used(user_id, chart_id):
+    """查询已使用的免费对话次数"""
+    conn = get_db()
+    count = conn.execute(
+        "SELECT COUNT(*) as n FROM chats WHERE user_id=? AND chart_id=?",
+        (user_id, chart_id)
+    ).fetchone()["n"]
+    conn.close()
+    return count
+
+def consume_free_chat(user_id, chart_id) -> bool:
+    """尝试消耗一次免费对话配额。返回 True 表示允许, False 表示已用完"""
+    used = get_free_chats_used(user_id, chart_id)
+    return used < FREE_CHAT_LIMIT
+
+def get_remaining_free_chats(user_id, chart_id) -> int:
+    """获取剩余免费对话次数"""
+    used = get_free_chats_used(user_id, chart_id)
+    return max(0, FREE_CHAT_LIMIT - used)
+
+
 # 初始化
 init_db()

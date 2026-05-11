@@ -14,16 +14,19 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from anthropic import Anthropic
 from geju_detect import detect_geju
-from storage import save_user, save_chart_and_reading, save_chat, load_chat_history, get_stats
+from storage import save_user, save_chart_and_reading, save_chat, load_chat_history, get_stats, consume_free_chat, get_remaining_free_chats
 
 BASE_DIR = Path(__file__).parent
 CALCULATOR = BASE_DIR / "chart_calculator.js"
 
-# Streamlit Cloud 自动装 Node.js 依赖
+# Streamlit Cloud / 本地自动装 Node.js 依赖
 import subprocess as _sp
+import platform as _plat
 _node_modules = BASE_DIR / "node_modules" / "iztro"
 if not _node_modules.exists():
-    _sp.run(["npm", "install"], cwd=str(BASE_DIR), capture_output=True)
+    npm_cmd = "npm.cmd" if _plat.system() == "Windows" else "npm"
+    _sp.run('"{}" install'.format(npm_cmd), cwd=str(BASE_DIR), capture_output=True, shell=True,
+            encoding="utf-8", errors="replace")
 
 # ================================================================
 # 配置
@@ -39,7 +42,7 @@ def _load_config():
         pass
     settings_path = Path.home() / ".claude" / "settings.json"
     if settings_path.exists():
-        with open(settings_path) as f:
+        with open(settings_path, encoding="utf-8") as f:
             s = json.load(f)
         env = s.get("env", {})
         return (
@@ -113,45 +116,198 @@ def build_chart_summary(chart_data, geju_list):
     basic = chart_data.get("基本信息", {})
     palaces = chart_data.get("命盘", [])
     geju_text = "\n".join(["- [" + g[0] + "](" + g[1] + "): " + g[2] for g in geju_list]) if geju_list else "(未检测到特殊格局)"
-    palace_text = ""
+
+    # 建立宫位索引
+    p_idx = {p["宫位"]: i for i, p in enumerate(palaces)}
+    palace_order = ["命宫","兄弟","夫妻","子女","财帛","疾厄","迁移","仆役","官禄","田宅","福德","父母"]
+
+    palace_text_lines = []
     for p in palaces:
-        extras = "[身宫]" if p.get("身宫") else ""
-        palace_text += "- {}({}{}){}: 主星[{}] 辅星[{}]\n".format(
-            p["宫位"], p["天干"], p["地支"], extras, p["主星"], p["辅星"])
+        gong = p["宫位"]
+        shen = " [身宫]" if p.get("身宫") else ""
+        sihua = (" 四化: " + p.get("四化", "")) if p.get("四化", "").strip() else ""
+
+        # 计算三方四正
+        if gong in palace_order:
+            idx = palace_order.index(gong)
+            dui = palace_order[(idx+6)%12]  # 对宫
+            he1 = palace_order[(idx+4)%12]  # 三合1
+            he2 = palace_order[(idx+8)%12]  # 三合2
+            sansi = f" 三方: {dui}+{he1}+{he2}"
+        else:
+            sansi = ""
+
+        palace_text_lines.append(
+            f"- {gong}({p['天干']}{p['地支']}{shen}){sansi}: 主星[{p['主星']}] 辅星[{p['辅星']}]{sihua}"
+        )
+
+    palace_text = "\n".join(palace_text_lines)
     return basic, geju_text, palace_text
+
+def build_share_card(chart_data, name, geju_list, share_id, reading_text=""):
+    """生成分享卡片HTML — AI解读精华, 截图传播用"""
+    # 从解读文本中提取 [命盘速览] 部分
+    insights = []
+    if reading_text:
+        in_speed = False
+        for line in reading_text.split("\n"):
+            line = line.strip()
+            if "命盘速览" in line or "速览" in line:
+                in_speed = True
+                continue
+            if in_speed and line.startswith("-"):
+                # 格式: "- 关键字: 一句话洞察"
+                parts = line[1:].strip().split(":", 1)
+                if len(parts) == 2:
+                    insights.append((parts[0].strip(), parts[1].strip()))
+                elif len(parts) == 1:
+                    insights.append(("", parts[0].strip()))
+            elif in_speed and line.startswith("###"):
+                break
+            elif in_speed and not line.startswith("-") and line:
+                # 可能是续行, 追加到最后一个 insight
+                if insights:
+                    last_k, last_v = insights[-1]
+                    insights[-1] = (last_k, last_v + " " + line)
+
+    # 如果没解析出来, 用默认数据
+    if not insights:
+        ming = next((p for p in chart_data.get("命盘", []) if p["宫位"] == "命宫"), {})
+        top_geju = geju_list[0][0] if geju_list else "—"
+        insights = [
+            ("命宫", f"主星 {ming.get('主星','—')}"),
+            ("格局", top_geju),
+            ("建议", "详情见完整解读"),
+        ]
+
+    basic = chart_data.get("基本信息", {})
+    insight_html = ""
+    colors = ["#c4a870", "#8ba4b4", "#a08050"]
+    for i, (label, text) in enumerate(insights[:3]):
+        c = colors[i % len(colors)]
+        insight_html += f"""
+        <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;border-left:2px solid {c};">
+          <div style="font-size:0.6rem;color:{c};letter-spacing:0.04em;margin-bottom:4px;">{label}</div>
+          <div style="font-size:0.82rem;color:#e8e0d4;font-weight:500;line-height:1.4;">{text}</div>
+        </div>"""
+
+    return f"""<div style="font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;background:linear-gradient(135deg,rgba(196,168,112,0.08),rgba(196,168,112,0.02));border:1px solid rgba(196,168,112,0.2);border-radius:14px;padding:20px 24px;max-width:100%;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div>
+        <div style="font-size:1rem;font-weight:600;color:#f0e6d2;">{name} · 命盘速览</div>
+        <div style="font-size:0.6rem;color:#6b5f4e;margin-top:2px;">{basic.get('四柱','')} · {chart_data.get('五行局','')}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:0.55rem;color:#6b5f4e;letter-spacing:0.06em;">SHARE</div>
+        <div style="font-size:0.85rem;font-weight:600;color:#c4a870;letter-spacing:0.06em;">#{share_id}</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      {insight_html}
+    </div>
+    <div style="text-align:center;margin-top:12px;font-size:0.55rem;color:#6b5f4e;letter-spacing:0.04em;">天纪 AI · 截图分享给朋友一起探索</div>
+  </div>"""
+
+def render_star_chart(chart_data):
+    """生成紫微斗数星盘HTML — 12宫格, 命宫高亮"""
+    palaces = chart_data.get("命盘", [])
+    if not palaces:
+        return ""
+
+    order_map = {"命宫":0,"兄弟":1,"夫妻":2,"子女":3,"财帛":4,"疾厄":5,
+                 "迁移":6,"仆役":7,"官禄":8,"田宅":9,"福德":10,"父母":11}
+    ordered = sorted(palaces, key=lambda p: order_map.get(p["宫位"], 99))
+
+    cards = []
+    for p in ordered:
+        is_ming = p["宫位"] == "命宫"
+        is_shen = p.get("身宫") or False
+        ming_glow = "box-shadow: 0 0 16px rgba(196,168,112,0.6);border:1px solid rgba(196,168,112,0.6);" if is_ming else ""
+        shen_badge = '<span style="font-size:9px;color:#c4a870;margin-left:4px;">身</span>' if is_shen else ""
+        bg = "rgba(196,168,112,0.12)" if is_ming else "rgba(255,255,255,0.04)"
+        border = "1px solid rgba(196,168,112,0.4)" if is_ming else "1px solid rgba(255,255,255,0.06)"
+        sihua = p.get("四化", "")
+
+        main_stars = p["主星"]
+        if main_stars == "无" or not main_stars:
+            main_stars = '<span style="color:#5a4f3e;font-style:italic;">借对宫</span>'
+
+        cards.append(f"""<div style="background:{bg};border:{border};{ming_glow}border-radius:8px;padding:8px 6px;text-align:center;font-size:10px;line-height:1.5;">
+        <div style="font-weight:600;color:#c4a870;margin-bottom:2px;font-size:11px;">{p['宫位']}{shen_badge}</div>
+        <div style="color:#6b5f4e;font-size:9px;margin-bottom:2px;">{p['天干']}{p['地支']}</div>
+        <div style="color:#e8e0d4;font-weight:500;font-size:10px;">{main_stars}</div>
+        <div style="color:#8b7e6a;font-size:8px;margin-top:1px;line-height:1.3;">{p['辅星']}</div>
+        {"<div style='color:#a08050;font-size:8px;margin-top:2px;'>"+sihua+"</div>" if sihua and sihua.strip() else ""}
+        </div>""")
+
+    grid = "".join(cards)
+    wuxing = chart_data.get("五行局", "")
+    return f"""<div style="font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:100%;overflow-x:auto;margin:16px 0 8px;">
+    <div style="font-size:11px;color:#6b5f4e;letter-spacing:0.06em;margin-bottom:10px;text-align:center;">紫微斗数 · 十二宫 · {wuxing}</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:4px;">{grid}</div>
+    </div>"""
 
 def generate_reading(chart_data, name, geju_list):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)
     rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=6000)
     basic, geju_text, palace_text = build_chart_summary(chart_data, geju_list)
 
-    prompt = """你是倪海夏天纪派紫微斗数解读师。你的解读像一位有智慧的老朋友——不绕弯子，不说废话，直接告诉你你这个人到底怎么回事。
+    prompt = """你是天纪派紫微斗数解读师，师承倪海夏先生。你说话的方式像一位阅历丰富、看透世事的前辈——不卖关子、不故弄玄虚、不绕弯子。你说的话每一句都要从命盘来，落到命盘去。
 
-你的风格：
-- 第一个句子就要戳中命主——"你是杀破狼格局，这辈子注定不是安稳命"——这种力度
-- 把格局的含义用现代人能秒懂的比喻说出来
-- 既说天赋也说坑，让人感觉"卧槽这不就是我吗"
-- 最后给的建议要能落地，不是"多行善事"这种正确的废话
-- 倪师的医者感——诊断人生，开方子
-- 用一两句让人想截图分享的金句收尾
+## 核心铁律
 
-以下是天纪原文资料：
+0. **大限流年数据声明。** 当前系统仅提供本命盘（出厂设置）数据，未计算真实的大限流年底层排盘。当用户问及"明年运势"、"现在走什么运"等时间性问题时，必须明确告诉用户："当前仅基于本命盘进行概率推演，具体流年运势需等系统接入大限流年排盘数据后才能给出确定性判断。"严禁在没有数据的情况下捏造具体年份的运势走向。
 
+1. **盘上有才算数，盘上没有不说。** 每一条判断之前，先引用命盘里哪颗星在哪个宫、哪条四化在引动。不允许脱离命盘进行"可能是"、"大概率是"的推测。
+
+2. **话不说死。** 不能说"你注定xxx"、"你这一生xxx"。说"倾向"、"容易"、"后天重心落在"、"如果大限流年引动则"。紫微不是宿命论——命盘给的是概率和倾向，不是判决书。
+
+3. **三层分开讲。**
+   - 先讲本命盘（你的出厂设置、性格底色、天赋与坑）
+   - 再讲当前大限（近十年的运势重心在哪个宫位、被什么星引动）
+   - 最后点一下当前流年（今年哪个宫在动、四化飞哪里、容易有什么变化）
+   不要把三层混在一起讲。
+
+4. **每条结论要有出处。** 比如不能说"适合做文职工作"。要这样说："身宫落在财帛宫，后天人生重心容易集中在资源、收入与价值交换上。财帛宫见天机天梁，偏智力型、规划型的求财方式。官禄宫见天同太阳，适合稳定组织、内容服务、管理支持类工作——所以整体倾向文职策划而非完全无框架的冒险。如果大限进一步引动财帛宫，这种倾向会更明显。"
+
+5. **格局判断要有分寸。** 检测到一个格局，不能只说它是什么。要说明——在三方四正里有没有被强化或被破坏？有没有吉星加持（禄存/天魁/天钺）或煞曜干扰（擎羊/陀罗/火星/铃星）？格局的强弱取决于周边星曜的配合。
+
+6. **口吻。** 平和、有分寸、有温度。像一位你信任的长辈在看你的盘，不吓你、不捧你、不说废话。不要"我告诉你啊"这种语气，不要感叹号轰炸，不要刻意制造"卧槽这就是我"的效果——好解读自己会让人产生这种感觉，不需要你喊出来。
+
+## 倪海夏天纪参考
 {rag}
 
-## 基本信息
-- 性别: {gender}
-- 阳历: {solar} 农历: {lunar}
-- 四柱: {sizhu}
-- 五行局: {wuxing}
+## {name}的命盘
 
-## 检测格局
+性别: {gender}
+阳历: {solar} | 农历: {lunar}
+四柱: {sizhu}
+五行局: {wuxing}
+
+### 检测到以下格局
 {geju}
 
-## 十二宫
+### 十二宫全盘
 {palace}
 
-请按格式解读。开头第一句话必须包含命主的名字和核心格局，让{name}觉得这就是在说我。""".format(
+## 解读格式
+
+请按以下结构输出解读：
+
+### 一、本命盘：你的出厂设置
+从命宫开始，逐一分析性格底色、思维模式、情感倾向、事业天赋、财富观念。每个判断必须落到具体星曜和宫位上。重点讲：主星是什么在哪个宫、三方四正看到了什么、有没有煞曜干扰、有没有吉星加持。
+
+### 二、身宫与后天重心
+身宫落在哪，后天人生的重心天然偏向哪个领域。
+
+### 三、当前大限与流年
+当前的大限在哪个宫位，被什么星引动。今年的流年四化飞到哪里，容易有什么变化。
+
+### 四、给你的建议
+基于以上分析，给3-5条能落地的建议。可以分事业、感情、健康几个方面。要具体，不空洞。
+
+### 五、[命盘速览]
+在你完成以上四个部分的解读后, 严格在全文末尾追加三行速览。每行格式: `- 关键字: 一句话洞察`。这三行是你对{name}命盘最核心的三条判断——可以是天赋、可以是坑、可以是建议。要精炼、要戳人、要让人想截图。每行不超过20字。""".format(
         rag=rag_context,
         gender=basic.get("性别",""),
         solar=basic.get("阳历",""),
@@ -164,7 +320,7 @@ def generate_reading(chart_data, name, geju_list):
     )
 
     response = client.messages.create(
-        model=API_MODEL, max_tokens=4096, temperature=0.8,
+        model=API_MODEL, max_tokens=4096, temperature=0.3,
         messages=[{"role": "user", "content": prompt}],
     )
     for block in response.content:
@@ -175,50 +331,65 @@ def generate_reading(chart_data, name, geju_list):
 
 def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)
-    rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=8000)
-    basic, geju_text, palace_text = build_chart_summary(chart_data, geju_list)
 
-    system_prompt = """你是倪海夏先生本人——天纪紫微斗数的大师。{name}正在和你面对面请教命盘问题。你的回答要让{name}感觉倪师真的看透了我的命盘。
+    # 上下文压缩: 首轮传完整命盘，后续对话传精简画像
+    if not chat_history or len(chat_history) < 200:
+        # 首轮: 完整数据
+        rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=8000)
+        basic, geju_text, palace_text = build_chart_summary(chart_data, geju_list)
+        context_block = """## {name}的命盘
 
-## {name}的完整命盘
+性别: {gender} | 阳历: {solar} | 农历: {lunar}
+四柱: {sizhu} | 五行局: {wuxing}
 
-性别: {gender}
-阳历: {solar}  农历: {lunar}
-四柱: {sizhu}  五行局: {wuxing}
-
-### 检测格局
+### 格局
 {geju}
 
 ### 十二宫全盘
 {palace}
 
-## 天纪原文参考（倪海夏原话）
-{rag}
+### 天纪参考
+{rag}""".format(
+            name=name, gender=basic.get("性别",""), solar=basic.get("阳历",""),
+            lunar=basic.get("农历",""), sizhu=basic.get("四柱",""), wuxing=chart_data.get("五行局",""),
+            geju=geju_text, palace=palace_text, rag=rag_context,
+        )
+    else:
+        # 后续轮次: 仅带核心格局+关键星曜的精简画像 + 最近对话
+        basic = chart_data.get("基本信息", {})
+        geju_names = "、".join([g[0] for g in geju_list]) if geju_list else "无特殊格局"
+        # 提取命宫关键星曜
+        ming_gong = next((p for p in chart_data.get("命盘",[]) if p["宫位"]=="命宫"), {})
+        ming_main = ming_gong.get("主星","无")
+        ming_sihua = ming_gong.get("四化","")
+        context_block = f"""## {name}的精简命盘画像
+性别: {basic.get('性别','')} | 四柱: {basic.get('四柱','')} | 五行局: {chart_data.get('五行局','')}
+核心格局: {geju_names}
+命宫主星: {ming_main} | 命宫四化: {ming_sihua}
+(上述精要信息已足够回答当前问题, 如需查其他宫位请告知)"""
+
+    system_prompt = """你是天纪派紫微斗数解读师，师承倪海夏先生。{name}正在和你面对面讨论ta的命盘。
+
+{context}
 
 ## 你的回答准则
 
-1. 深: 不是一两句话，而是从命盘出发做系统性分析。如果问事业，不只说适合创业，而要结合命宫+官禄+财帛+大限分析
-2. 准: 紧扣{name}命盘里的具体星曜和宫位。每个判断都要落到具体星曜宫位上
-3. 敢: 像倪师一样敢下判断。不模棱两可
-4. 活: 用现代人能懂的比喻翻译古典术语
-5. 结构: 先给结论，再给论据（从命盘哪颗星哪个宫看出来的），最后给落地建议
-6. 不恐吓: 如果看到不好的，用留意、注意、多花时间在这块的方式说，不吓人""".format(
-        name=name,
-        gender=basic.get("性别",""),
-        solar=basic.get("阳历",""),
-        lunar=basic.get("农历",""),
-        sizhu=basic.get("四柱",""),
-        wuxing=chart_data.get("五行局",""),
-        geju=geju_text,
-        palace=palace_text,
-        rag=rag_context,
+0. **大限流年声明。** 当前系统仅计算本命盘数据。如用户问及具体年份运势，必须声明"当前仅基于本命盘推演，具体流年需等系统接入大限流年排盘数据后才能给出确定性判断"。严禁捏造流年运势。
+
+1. **盘上有才算数。** 每一条判断必须引用具体星曜和宫位。
+2. **话不说死。** 说"倾向"、"容易"、"如果大限引动则"。不说"你注定"。
+3. **结构清楚。** 先给结论 → 再给依据 → 最后给建议。
+4. **不恐吓。** 看到煞曜用"留意"、"需要多花时间"的方式说。
+5. **用现代比喻翻译古典术语。** 不哗众取宠。
+6. **问答有交互感。** {name}问什么你就针对什么回答，不背命盘。""".format(
+        name=name, context=context_block,
     )
 
     user_msg = "之前聊过的内容：\n{history}\n\n---\n{name}现在问: {q}\n\n请倪师基于{name}的完整命盘，做一个深度的、全方位的解读。要具体、要敢说、要让人听完觉得值了。".format(
         history=chat_history, name=name, q=user_question)
 
     response = client.messages.create(
-        model=API_MODEL, max_tokens=4096, temperature=0.85,
+        model=API_MODEL, max_tokens=4096, temperature=0.3,
         system=system_prompt,
         messages=[{"role": "user", "content": user_msg}],
     )
@@ -231,30 +402,114 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
 # UI
 # ================================================================
 
-st.set_page_config(page_title="天纪AI", page_icon="\U0001F52E", layout="centered")
+st.set_page_config(
+    page_title="天纪AI",
+    page_icon="\U0001F52E",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
 
+# ── 全局样式 ──────────────────────────────────
 st.markdown("""
 <style>
-  @media (max-width: 768px) {
-    .stApp { padding: 0.5rem !important; }
-    h1 { font-size: 1.5rem !important; }
-    h2 { font-size: 1.2rem !important; }
-    .stForm { padding: 10px !important; }
-    .stMarkdown p { font-size: 0.95rem !important; line-height: 1.7 !important; }
+  /* 背景与字体 */
+  .stApp { background: linear-gradient(180deg, #1a1625 0%, #1f1a2e 30%, #1a1625 100%); }
+  .stApp > header { background: transparent !important; }
+  .stApp > footer { background: transparent !important; }
+
+  /* 全局文字 */
+  html, body, p, span, div, label, input, select, textarea {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+    color: #e8e0d4;
   }
-  input, select, textarea, button { font-size: 16px !important; }
-  .stFormSubmitButton button { font-weight: 600 !important; font-size: 1.1rem !important; }
+
+  h1 { color: #f0e6d2 !important; font-weight: 300 !important; letter-spacing: 0.04em !important; }
+  h2 { color: #d4c8b0 !important; font-weight: 400 !important; font-size: 1.1rem !important; }
+  h3 { color: #c4a870 !important; font-weight: 400 !important; font-size: 0.9rem !important; letter-spacing: 0.06em !important; text-transform: uppercase; }
+
+  /* Cards */
+  .card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+  }
+  .card h3 { margin-top: 0; color: #c4a870; }
+
+  /* 表单 */
+  .stTextInput > div > div > input, .stSelectbox > div > div > select {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 8px !important;
+    color: #e8e0d4 !important;
+  }
+  .stDateInput > div > div > input {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 8px !important;
+    color: #e8e0d4 !important;
+  }
+  .stFormSubmitButton button {
+    background: linear-gradient(135deg, #8b6914, #c4a870) !important;
+    border: none !important;
+    color: #1a1625 !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.06em !important;
+    border-radius: 10px !important;
+    padding: 12px 32px !important;
+    font-size: 1rem !important;
+    transition: all 0.2s !important;
+  }
+  .stFormSubmitButton button:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(196,168,112,0.3); }
+
+  /* Metrics */
+  [data-testid="stMetric"] { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 8px 12px; }
+  [data-testid="stMetric"] label { color: #8b7e6a !important; font-size: 0.7rem !important; letter-spacing: 0.04em; }
+  [data-testid="stMetric"] div { color: #d4c8b0 !important; }
+
+  /* Expander */
+  .stExpander { border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 12px !important; }
+  .stExpander > div { background: transparent !important; }
+
+  /* Tabs */
+  .stTabs [role="tab"] { color: #8b7e6a !important; }
+  .stTabs [role="tab"][aria-selected="true"] { color: #c4a870 !important; border-bottom-color: #c4a870 !important; }
+
+  /* Divider */
+  hr { border-color: rgba(255,255,255,0.08) !important; }
+
+  /* Info/Warning boxes */
+  .stAlert { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 10px !important; }
+  .stAlert p { color: #d4c8b0 !important; }
+
+  /* Captions */
+  .stCaption { color: #6b5f4e !important; }
+
+  /* Chat */
+  .stChatMessage { background: transparent !important; }
+  .stChatMessage [data-testid="stChatMessageContent"] { color: #e8e0d4 !important; }
+
+  @media (max-width: 768px) {
+    .stApp { padding: 0.8rem !important; }
+    h1 { font-size: 1.3rem !important; }
+  }
 </style>
 """, unsafe_allow_html=True)
 
 for key in ["chart_data","reading","geju_list","name","chat_history",
             "true_h","true_m","zhi_idx","hour","minute","city","lon",
-            "user_id","chart_id"]:
+            "user_id","chart_id","share_id"]:
     if key not in st.session_state:
         st.session_state[key] = None if key != "chat_history" else []
 
-st.title("\U0001F52E 天纪AI")
-st.caption("紫微斗数 · 倪海夏天纪体系 · AI解读 · 真太阳时校正")
+st.markdown("""
+<div style="text-align:center;padding:20px 0 10px;">
+  <div style="font-size:2.4rem;margin-bottom:4px;">🔮</div>
+  <h1 style="font-size:2rem;margin-bottom:4px;">天纪</h1>
+  <p style="color:#8b7e6a;font-size:0.85rem;letter-spacing:0.06em;">紫微斗数 · 倪海夏天纪体系 · AI解读</p>
+</div>
+""", unsafe_allow_html=True)
 st.markdown("---")
 
 with st.form("input_form"):
@@ -275,7 +530,7 @@ with st.form("input_form"):
     submitted = st.form_submit_button("\U0001F52E 开始解读", type="primary", use_container_width=True)
 
 st.markdown("---")
-st.caption("仅供娱乐 · AI生成内容不构成任何建议 · 天纪体系源自倪海夏先生")
+st.caption("AI 生成内容 · 仅供娱乐参考 · 天纪体系源自倪海夏先生")
 
 if submitted and name:
     try:
@@ -333,15 +588,15 @@ if st.session_state.chart_data is not None:
     lon = st.session_state.lon
 
     st.markdown("---")
-    st.success(name + " 的命盘解读完成")
+    st.markdown(f'<div style="text-align:center;padding:12px 0;"><span style="color:#c4a870;font-size:1.1rem;">{name}</span><span style="color:#8b7e6a;font-size:0.85rem;"> · 命盘解读</span></div>', unsafe_allow_html=True)
 
     time_display = get_time_display(zhi_idx)
-    cols = st.columns(5)
-    cols[0].metric("北京时间", "{:02d}:{:02d}".format(hour, minute))
-    cols[1].metric("出生城市", city + "(" + str(lon) + "E)")
-    cols[2].metric("真太阳时", "{:02d}:{:02d}".format(true_h, true_m))
-    cols[3].metric("校正时辰", time_display)
-    cols[4].metric("五行局", chart_data.get("五行局",""))
+    mt_cols = st.columns(5)
+    mt_cols[0].metric("北京时间", "{:02d}:{:02d}".format(hour, minute))
+    mt_cols[1].metric("出生城市", city)
+    mt_cols[2].metric("真太阳时", "{:02d}:{:02d}".format(true_h, true_m))
+    mt_cols[3].metric("校正时辰", time_display)
+    mt_cols[4].metric("五行局", chart_data.get("五行局",""))
 
     basic = chart_data.get("基本信息",{})
     st.caption("农历 {} · 四柱 {} · 生肖 {}".format(
@@ -349,31 +604,61 @@ if st.session_state.chart_data is not None:
 
     if geju_list:
         st.markdown("---")
-        st.subheader("自动检测格局")
+        st.markdown('<div style="font-size:0.9rem;color:#c4a870;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:12px;">格局检测</div>', unsafe_allow_html=True)
         cols_g = st.columns(min(3, len(geju_list)))
         for i, (name_g, type_g, desc) in enumerate(geju_list):
-            emoji = "\U0001F3C6" if type_g=="富贵" else "⚡" if type_g=="命格" else "\U0001F4A1" if type_g=="特殊" else "⚠"
-            cols_g[i%3].info("{} {}: {}...".format(emoji, name_g, desc[:80]))
+            if type_g == "富贵":
+                accent = "#c4a870"
+            elif type_g == "命格":
+                accent = "#8ba4b4"
+            elif type_g == "警示":
+                accent = "#c08070"
+            else:
+                accent = "#8b9e7a"
+            cols_g[i%3].markdown(f"""
+            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-left:3px solid {accent};border-radius:6px;padding:12px;margin-bottom:8px;">
+              <div style="font-weight:600;color:{accent};font-size:0.85rem;margin-bottom:4px;">{name_g}</div>
+              <div style="color:#8b7e6a;font-size:0.75rem;line-height:1.5;">{desc[:100]}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # 星盘 — 直接显示
+    chart_html = render_star_chart(chart_data)
+    st.components.v1.html(chart_html, height=420, scrolling=False)
 
     st.markdown("---")
     st.markdown(reading)
 
+    # ── 分享卡片 ──────────────────────────────
     st.markdown("---")
-    st.subheader("和倪师聊聊你的命盘")
+    if "share_id" not in st.session_state or st.session_state.share_id is None:
+        st.session_state.share_id = ''.join(random.choices('0123456789abcdef', k=6))
+    share_html = build_share_card(chart_data, name, geju_list, st.session_state.share_id, reading)
+    st.components.v1.html(share_html, height=320, scrolling=False)
+
+    st.markdown("---")
+    st.markdown('<div style="font-size:0.9rem;color:#c4a870;letter-spacing:0.06em;margin-bottom:12px;">与倪师对话</div>', unsafe_allow_html=True)
     chat_tab1, chat_tab2 = st.tabs(["免费体验", "对话记录"])
 
     with chat_tab1:
-        with st.form("chat_form", clear_on_submit=True):
-            user_q = st.text_input("想问倪师什么?", placeholder="比如: 我这个命格适合创业吗?")
-            chat_submitted = st.form_submit_button("问倪师")
-            if chat_submitted and user_q:
-                with st.spinner("倪师思考中..."):
-                    history_str = "\n".join(["问: {}\n答: {}".format(q,a) for q,a in st.session_state.chat_history[-5:]])
-                    chat_reply = generate_chat(chart_data, name, geju_list, user_q, history_str)
-                st.session_state.chat_history.append((user_q, chat_reply))
-                save_chat(st.session_state.user_id, st.session_state.chart_id, user_q, chat_reply)
-                st.rerun()
-        st.caption("付费版支持无限多轮对话")
+        remaining = get_remaining_free_chats(st.session_state.user_id, st.session_state.chart_id)
+        if remaining > 0:
+            st.caption("免费对话剩余 {} 次".format(remaining))
+            with st.form("chat_form", clear_on_submit=True):
+                user_q = st.text_input("想问倪师什么?", placeholder="比如: 我这个命格适合创业吗?")
+                chat_submitted = st.form_submit_button("问倪师")
+                if chat_submitted and user_q:
+                    if not consume_free_chat(st.session_state.user_id, st.session_state.chart_id):
+                        st.error("免费次数已用完，请升级付费版继续对话")
+                    else:
+                        with st.spinner("倪师思考中..."):
+                            history_str = "\n".join(["问: {}\n答: {}".format(q,a) for q,a in st.session_state.chat_history[-3:]])
+                            chat_reply = generate_chat(chart_data, name, geju_list, user_q, history_str)
+                        st.session_state.chat_history.append((user_q, chat_reply))
+                        save_chat(st.session_state.user_id, st.session_state.chart_id, user_q, chat_reply)
+                        st.rerun()
+        else:
+            st.info("免费体验已用完。升级付费版即可无限对话，含大限流年解读、合盘、流月运势。")
 
     with chat_tab2:
         if st.session_state.chat_history:
@@ -384,9 +669,7 @@ if st.session_state.chart_data is not None:
         else:
             st.caption("还没有对话记录")
 
-    share_id = ''.join(random.choices('0123456789abcdef', k=6))
-    st.markdown("---")
-    st.info("分享码: {}  |  截图分享给朋友,让他们也来测!".format(share_id))
+    st.markdown(f'<div style="text-align:center;color:#6b5f4e;font-size:0.7rem;padding:8px;">截图分享给朋友一起探索</div>', unsafe_allow_html=True)
 
     with st.expander("查看命盘数据"):
         st.json(chart_data)

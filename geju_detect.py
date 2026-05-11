@@ -59,15 +59,15 @@ def detect_geju(chart_data):
         return result
 
     def surrounding_palaces(gong_name):
-        """获取三方四正的宫名列表"""
+        """获取三方四正的宫名列表：本宫+对宫+两个三合宫"""
         palace_order = ["命宫", "兄弟", "夫妻", "子女", "财帛", "疾厄", "迁移", "仆役", "官禄", "田宅", "福德", "父母"]
         if gong_name not in palace_order:
             return []
         idx = palace_order.index(gong_name)
         return [
             palace_order[idx],                          # 本宫
-            palace_order[(idx + 4) % 12],                # 对宫
-            palace_order[(idx + 8) % 12],                # 三合1
+            palace_order[(idx + 6) % 12],                # 对宫
+            palace_order[(idx + 4) % 12],                # 三合1
             palace_order[(idx + 8) % 12],                # 三合2
         ]
 
@@ -88,15 +88,18 @@ def detect_geju(chart_data):
     ming_all = all_stars("命宫")
     all_s = all_palace_stars()
 
-    # ─── 杀破狼系列 ───
+    # ─── 杀破狼系列 ─── 必须在命宫三方四正才成立
     sha_po_lang = {"七杀", "破军", "贪狼"}
-    sha_po_lang_count = len(sha_po_lang & set(all_s))
-    if sha_po_lang_count >= 3:
-        results.append(("杀破狼格", "命格", "七杀、破军、贪狼三星全现于命盘。人生必经历一次以上的重大开创或变革，性格果敢有决断力，不喜安逸，适合创业、军警、外科等领域。"))
-    elif sha_po_lang_count >= 2 and (sha_po_lang & set(ming_all)):
-        results.append(("半杀破狼", "命格", "杀破狼三星见其二且入命宫或三方四正。有变动创新的倾向，但不及完整杀破狼格局之强烈。"))
-    if sha_po_lang & set(stars_of("迁移")):
-        results.append(("杀破狼出外格", "命格", "杀破狼星在迁移宫，主外出闯荡、动中求财。"))
+    ming_surrounding = stars_in_surrounding("命宫")
+    sha_po_lang_in_ming = sha_po_lang & ming_surrounding
+    if len(sha_po_lang_in_ming) >= 3:
+        results.append(("杀破狼格", "命格", "七杀、破军、贪狼三星全现于命宫三方四正。命主动荡中开创，不喜安逸。若遇吉星(禄存/天魁/天钺)，开创有成；若遇煞星(擎羊/陀罗)，则动荡加剧需防冒险失控。"))
+    elif len(sha_po_lang_in_ming) >= 2:
+        missing = sha_po_lang - sha_po_lang_in_ming
+        results.append((f"半杀破狼（缺{'/'.join(missing)}）", "命格", f"杀破狼缺{'/'.join(missing)}，有开创之心但格局未全。需看大限流年是否能补足缺失之星曜。"))
+    # 杀破狼不在命宫而在迁移宫
+    if sha_po_lang & set(all_stars("迁移")):
+        results.append(("杀破狼在迁移", "命格", "杀破狼星在迁移宫，主外出闯荡、动中求财。在外地/海外发展的动能较强。"))
 
     # ─── 紫微系列 ───
     if has_star("命宫", "紫微"):

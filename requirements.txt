@@ -1,2 +1,6 @@
 streamlit
 anthropic
+rank-bm25
+sentence-transformers
+jieba
+numpy

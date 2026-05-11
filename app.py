@@ -493,6 +493,11 @@ st.markdown("""
   @media (max-width: 768px) {
     .stApp { padding: 0.8rem !important; }
     h1 { font-size: 1.3rem !important; }
+    .stForm { padding: 10px 0 !important; }
+    .stTabs { margin-bottom: 20px !important; }
+    .stExpander { margin-top: 20px !important; margin-bottom: 40px !important; }
+    .stChatMessage { max-width: 100% !important; }
+    iframe { max-width: 100% !important; }
   }
 </style>
 """, unsafe_allow_html=True)
@@ -624,7 +629,7 @@ if st.session_state.chart_data is not None:
 
     # 星盘 — 直接显示
     chart_html = render_star_chart(chart_data)
-    st.components.v1.html(chart_html, height=420, scrolling=False)
+    st.components.v1.html(chart_html, height=420, scrolling=True)
 
     st.markdown("---")
     st.markdown(reading)
@@ -634,7 +639,7 @@ if st.session_state.chart_data is not None:
     if "share_id" not in st.session_state or st.session_state.share_id is None:
         st.session_state.share_id = ''.join(random.choices('0123456789abcdef', k=6))
     share_html = build_share_card(chart_data, name, geju_list, st.session_state.share_id, reading)
-    st.components.v1.html(share_html, height=320, scrolling=False)
+    st.components.v1.html(share_html, height=350, scrolling=True)
 
     st.markdown("---")
     st.markdown('<div style="font-size:0.9rem;color:#c4a870;letter-spacing:0.06em;margin-bottom:12px;">与倪师对话</div>', unsafe_allow_html=True)

@@ -6,3 +6,4 @@ __pycache__/
 *.pyc
 .env
 jarvis_live.html
+.rag_index/

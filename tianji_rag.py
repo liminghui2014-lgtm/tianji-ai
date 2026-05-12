@@ -218,4 +218,5 @@ def get_rag() -> TianjiRAG:
     global _rag_instance
     if _rag_instance is None:
         _rag_instance = TianjiRAG()
+        _rag_instance._ensure_loaded()  # 启动时预热，第一次解读不用等
     return _rag_instance

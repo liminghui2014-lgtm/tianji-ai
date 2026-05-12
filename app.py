@@ -53,6 +53,7 @@ def _load_config():
     return "", "https://api.deepseek.com/anthropic", "DeepSeek-V4-pro[1m]"
 
 API_KEY, API_BASE, API_MODEL = _load_config()
+API_MODEL_FAST = API_MODEL.replace("-pro", "-flash")  # flash 比 pro 快3-5倍
 
 # RAG
 from tianji_rag import get_rag
@@ -65,12 +66,46 @@ TIANJI_RAG = get_rag()
 SHI_CHEN_NAMES = ["子时","丑时","寅时","卯时","辰时","巳时","午时","未时","申时","酉时","戌时","亥时"]
 
 CITY_LON = {
-    "北京":116.4,"上海":121.5,"广州":113.3,"深圳":114.1,"成都":104.1,"重庆":106.5,
-    "武汉":114.3,"南京":118.8,"杭州":120.2,"西安":108.9,"天津":117.2,"沈阳":123.4,
-    "哈尔滨":126.6,"昆明":102.7,"长沙":113.0,"郑州":113.7,"济南":117.0,"青岛":120.3,
-    "大连":121.6,"厦门":118.1,"福州":119.3,"合肥":117.3,"南昌":115.9,"贵阳":106.7,
-    "兰州":103.8,"南宁":108.3,"石家庄":114.5,"太原":112.5,"呼和浩特":111.7,
-    "乌鲁木齐":87.6,"拉萨":91.1,"西宁":101.8,"银川":106.3,"海口":110.3,
+    # 直辖市
+    "北京":116.4,"上海":121.5,"天津":117.2,"重庆":106.5,
+    # 广东省
+    "广州":113.3,"深圳":114.1,"东莞":113.8,"佛山":113.1,"珠海":113.6,"中山":113.4,
+    "惠州":114.4,"汕头":116.7,"江门":113.1,"湛江":110.4,"肇庆":112.5,"茂名":110.9,
+    # 浙江省
+    "杭州":120.2,"宁波":121.5,"温州":120.7,"嘉兴":120.8,"湖州":120.1,"绍兴":120.6,
+    "金华":119.7,"台州":121.4,"舟山":122.2,"丽水":119.9,"衢州":118.9,
+    # 江苏省
+    "南京":118.8,"苏州":120.6,"无锡":120.3,"常州":120.0,"南通":120.9,"徐州":117.2,
+    "扬州":119.4,"镇江":119.4,"泰州":119.9,"淮安":119.0,"连云港":119.2,"盐城":120.2,"宿迁":118.3,
+    # 福建省
+    "福州":119.3,"厦门":118.1,"泉州":118.6,"漳州":117.7,"莆田":119.0,"龙岩":117.0,"三明":117.6,
+    # 四川省
+    "成都":104.1,"绵阳":104.7,"宜宾":104.6,"泸州":105.4,"南充":106.1,"达州":107.5,"乐山":103.8,
+    # 湖北省
+    "武汉":114.3,"宜昌":111.3,"襄阳":112.1,"荆州":112.2,"黄石":115.0,"十堰":110.8,
+    # 湖南省
+    "长沙":113.0,"株洲":113.1,"湘潭":112.9,"衡阳":112.6,"岳阳":113.1,"常德":111.7,
+    # 山东省
+    "济南":117.0,"青岛":120.3,"烟台":121.4,"潍坊":119.1,"威海":122.1,"临沂":118.4,"淄博":118.1,
+    # 河南省
+    "郑州":113.7,"洛阳":112.4,"开封":114.3,"南阳":112.5,"新乡":113.9,"许昌":113.8,
+    # 河北省
+    "石家庄":114.5,"唐山":118.2,"保定":115.5,"邯郸":114.5,"廊坊":116.7,"秦皇岛":119.6,
+    # 辽宁省
+    "沈阳":123.4,"大连":121.6,"鞍山":123.0,"抚顺":124.0,"锦州":121.1,"营口":122.2,
+    # 其他省份省会及重要城市
+    "哈尔滨":126.6,"长春":125.3,"吉林":126.5,
+    "西安":108.9,"宝鸡":107.2,"咸阳":108.7,
+    "昆明":102.7,"大理":100.2,"丽江":100.2,"曲靖":103.8,"保山":99.2,"普洱":101.0,"临沧":100.1,"玉溪":102.5,"昭通":103.7,"楚雄":101.5,"红河":103.3,"文山":104.2,"西双版纳":100.8,"德宏":98.6,"怒江":98.9,"迪庆":99.7,
+    "贵阳":106.7,"遵义":106.9,"六盘水":104.8,"安顺":105.9,"毕节":105.3,"铜仁":109.2,"黔东南":107.9,"黔南":107.5,"黔西南":104.9,
+    "合肥":117.3,"芜湖":118.4,"马鞍山":118.5,
+    "南昌":115.9,"九江":116.0,"赣州":115.0,
+    "兰州":103.8,"天水":105.7,
+    "南宁":108.3,"桂林":110.3,"柳州":109.4,
+    "太原":112.5,"大同":113.3,
+    "呼和浩特":111.7,"包头":109.8,"鄂尔多斯":109.8,
+    "乌鲁木齐":87.6,"克拉玛依":84.9,
+    "拉萨":91.1,"西宁":101.8,"银川":106.3,"海口":110.3,"三亚":109.5,
     "香港":114.2,"澳门":113.5,"台北":121.5,"其他":120.0,
 }
 
@@ -320,7 +355,7 @@ def generate_reading(chart_data, name, geju_list):
     )
 
     response = client.messages.create(
-        model=API_MODEL, max_tokens=4096, temperature=0.3,
+        model=API_MODEL_FAST, max_tokens=4096, temperature=0.3,
         thinking={"type": "disabled"},
         messages=[{"role": "user", "content": prompt}],
     )
@@ -390,7 +425,7 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
         history=chat_history, name=name, q=user_question)
 
     response = client.messages.create(
-        model=API_MODEL, max_tokens=4096, temperature=0.3,
+        model=API_MODEL_FAST, max_tokens=4096, temperature=0.3,
         thinking={"type": "disabled"},
         system=system_prompt,
         messages=[{"role": "user", "content": user_msg}],
@@ -422,15 +457,16 @@ st.markdown("""
   /* 全局文字 */
   .stApp, .stMarkdown, .stMarkdown p, .stMarkdown li {
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif !important;
-    line-height: 1.7 !important;
+    line-height: 1.55 !important;
+    font-size: 0.9rem !important;
   }
   .stApp { color: #e8e0d4 !important; }
-  .stMarkdown p, .stMarkdown li, .stMarkdown div { color: #e8e0d4 !important; line-height: 1.7 !important; }
-  p, li { line-height: 1.7 !important; color: #e8e0d4 !important; }
+  .stMarkdown p, .stMarkdown li, .stMarkdown div { color: #e8e0d4 !important; line-height: 1.55 !important; font-size: 0.9rem !important; }
+  p, li { line-height: 1.55 !important; color: #e8e0d4 !important; font-size: 0.9rem !important; }
 
-  h1 { color: #f0e6d2 !important; font-weight: 300 !important; letter-spacing: 0.04em !important; line-height: 1.3 !important; }
-  h2 { color: #d4c8b0 !important; font-weight: 400 !important; font-size: 1.1rem !important; line-height: 1.4 !important; }
-  h3 { color: #c4a870 !important; font-weight: 400 !important; font-size: 0.9rem !important; letter-spacing: 0.06em !important; }
+  h1 { color: #f0e6d2 !important; font-weight: 300 !important; letter-spacing: 0.04em !important; line-height: 1.3 !important; font-size: 1.5rem !important; }
+  h2 { color: #d4c8b0 !important; font-weight: 400 !important; font-size: 0.95rem !important; line-height: 1.4 !important; }
+  h3 { color: #c4a870 !important; font-weight: 400 !important; font-size: 0.8rem !important; letter-spacing: 0.06em !important; }
 
   /* Cards */
   .card {
@@ -499,7 +535,8 @@ st.markdown("""
 
   @media (max-width: 768px) {
     .stApp { padding: 0.8rem !important; }
-    h1 { font-size: 1.3rem !important; }
+    h1 { font-size: 1.2rem !important; }
+    p, li, .stMarkdown p { font-size: 0.82rem !important; }
     .stForm { padding: 10px 0 !important; }
     .stTabs { margin-bottom: 20px !important; }
     .stExpander { margin-top: 20px !important; margin-bottom: 40px !important; }
@@ -545,30 +582,67 @@ if cid and st.session_state.chart_data is None:
 
 st.markdown("""
 <div style="text-align:center;padding:20px 0 10px;">
-  <div style="font-size:2.4rem;margin-bottom:4px;">🔮</div>
-  <h1 style="font-size:2rem;margin-bottom:4px;">天纪</h1>
-  <p style="color:#8b7e6a;font-size:0.85rem;letter-spacing:0.06em;">紫微斗数 · 倪海夏天纪体系 · AI解读</p>
-  <p style="color:#c4a870;font-size:0.8rem;margin-top:8px;">与倪师面对面聊你的命盘 —— 不是冷冰冰的报告，是对话。</p>
+  <h1 style="font-size:1.3rem;margin-bottom:4px;">天纪</h1>
+  <p style="color:#8b7e6a;font-size:0.75rem;letter-spacing:0.06em;">倪海夏 · 天纪体系 · AI 解读与对话</p>
 </div>
 """, unsafe_allow_html=True)
 
-# RAG vs 普通AI介绍 — 直接展示，不在 expander 里
+# 关于天纪
 st.markdown("""
 <div style="
   background: rgba(196,168,112,0.08);
   border: 1px solid rgba(196,168,112,0.2);
   border-radius: 10px;
   padding: 16px 18px;
-  margin: 0 0 20px 0;
+  margin: 0 0 16px 0;
   font-size: 0.85rem;
   line-height: 1.6;
 ">
-<strong style="color:#c4a870;">天纪 AI vs 普通大语言模型</strong><br><br>
-<strong>普通 AI（豆包 / ChatGPT / Kimi）：</strong><br>
-能聊紫微斗数的术语，但容易张冠李戴——把天机星当成天府星、把 "杀破狼" 说成 "七杀破军天狼"。没有倪海夏的语言指纹——像一个在背维基百科的学生。<br><br>
-<strong>天纪 AI 的 RAG 架构：</strong><br>
-87 万字倪海夏《天纪》字幕语料作为知识库。解读时先检索倪师原话，再用 AI 以倪师的思维框架和语言风格生成解读。每条判断锚定在倪师的真实语境中——不是 AI "想象" 倪海夏会怎么说，是从原文中检索倪师真实说过的话。<br><br>
-<strong>这就像：</strong>普通 AI 是一个读了几本紫微斗数百科的人在和你说命盘；天纪 AI 是倪师本人在看你的盘——他的原话、他的思维、他的分寸。
+<strong style="color:#c4a870;">什么是天纪</strong><br><br>
+天纪是倪海夏先生讲授的紫微斗数课程，但它的内容远不止算命。<br><br>
+倪师认为，一个人的命运由三部分组成：<br>
+<strong>三分看盘</strong> —— 紫微斗数命盘是「出厂设置」，显示你的天赋、性格、运势走向<br>
+<strong>三分风水</strong> —— 居住环境、方位格局对人生的影响，阳宅阴宅皆在其中<br>
+<strong>三分易理处事</strong> —— 易经的智慧落到日常：什么时候进、什么时候退、怎么和人相处、怎么面对逆境<br><br>
+所以天纪不只是告诉你「命好不好」——它会教你怎么认识自己，怎么与环境相处，怎么在关键时刻做出对的判断。命盘是起点，不是终点。
+</div>
+""", unsafe_allow_html=True)
+
+# RAG 差异化
+st.markdown("""
+<div style="
+  background: rgba(196,168,112,0.06);
+  border: 1px solid rgba(196,168,112,0.15);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 0 0 16px 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+">
+<strong style="color:#c4a870;">为什么天纪 AI 与普通 AI 不同</strong><br>
+普通 AI 像一个背过维基百科的学生——紫微斗数的术语它都见过，但容易张冠李戴。天纪 AI 基于 87 万字倪师《天纪》原话语料构建 RAG 知识库，每一次回答都先检索倪师真实说过的内容，再以倪师的思维框架生成解读。你听到的不是 AI 的想象，是倪师本人的原话、分寸和智慧。
+</div>
+""", unsafe_allow_html=True)
+
+# 引导提问方向
+st.markdown("""
+<div style="
+  background: rgba(196,168,112,0.04);
+  border: 1px solid rgba(196,168,112,0.1);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 0 0 12px 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+">
+<strong style="color:#c4a870;">你可以从这些角度了解自己</strong><br><br>
+不只是「我什么时候发财」——天纪能聊的远比算命多：<br><br>
+<strong>命理</strong> —— 我的命盘格局是什么？杀破狼还是机月同梁？适合创业还是守成？<br>
+<strong>风水</strong> —— 家里哪个方位影响我的运势？办公室怎么布置对自己有利？<br>
+<strong>中医健康</strong> —— 命盘里哪些星曜提示了健康隐患？五行失衡怎么调？<br>
+<strong>易经处事</strong> —— 当下这个困局，易经里哪一卦给我启发？是该进还是该等？<br>
+<strong>人生选择</strong> —— 这段感情要不要继续？这个城市适合我发展吗？<br><br>
+不要只问「我命好不好」——命盘是一个地图，怎么走是你的事。天纪的责任是帮你把地图读懂。
 </div>
 """, unsafe_allow_html=True)
 
@@ -650,7 +724,7 @@ if st.session_state.chart_data is not None:
     lon = st.session_state.lon
 
     st.markdown("---")
-    st.markdown(f'<div style="text-align:center;padding:12px 0;"><span style="color:#c4a870;font-size:1.1rem;">{name}</span><span style="color:#8b7e6a;font-size:0.85rem;"> · 命盘解读</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align:center;padding:12px 0;"><span style="color:#c4a870;font-size:0.9rem;">{name}</span><span style="color:#8b7e6a;font-size:0.75rem;"> · 命盘解读</span></div>', unsafe_allow_html=True)
 
     time_display = get_time_display(zhi_idx)
     mt_cols = st.columns(5)
@@ -701,7 +775,7 @@ if st.session_state.chart_data is not None:
     st.markdown("""
     <div style="background:rgba(196,168,112,0.1);border:1px solid rgba(196,168,112,0.3);border-radius:12px;padding:20px 24px;margin-bottom:12px;text-align:center;">
       <h3 style="color:#c4a870;margin:0 0 4px;">与倪师对话</h3>
-      <p style="color:#b0a090;font-size:0.85rem;margin:0;">这不是一份冷冰冰的报告。这是倪海夏在和你面对面聊你的命盘。<br>追问他任何问题——他就像真的坐在你面前看你的盘。</p>
+      <p style="color:#e8e0d4;font-size:0.85rem;margin:0;">倪师说：三分看盘，三分风水，三分易理处事。<br>不要只问「命好不好」——聊命理、聊风水、聊中医、聊易经、聊人生进退。<br>命盘是地图，怎么走是你的事。天纪的责任是帮你把地图读懂。</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -722,40 +796,45 @@ if st.session_state.chart_data is not None:
         if remaining > 0:
             st.caption("免费对话剩余 {} 次（反馈后可再得 3 次）".format(remaining))
 
-            # 快捷问题按钮
-            st.markdown('<p style="font-size:0.8rem;color:#8b7e6a;margin:8px 0 4px;">常用问题（点击直接发送）：</p>', unsafe_allow_html=True)
+            # 快捷问题——直接发送，不用表单
+            st.markdown('<p style="font-size:0.8rem;color:#e8e0d4;margin:8px 0 4px;">点击直接发送：</p>', unsafe_allow_html=True)
             quick_qs = [
-                "我这个命适合创业还是打工？",
-                "我的财运怎么样？什么时候有转机？",
-                "感情和婚姻方面有什么要注意的？",
-                "今年事业上有什么机会和坑？",
-                "我的健康有什么隐患吗？",
+                "我的命盘格局适合做什么？",
+                "家里风水怎么调对我的运势好？",
+                "健康上有什么要注意的？中医角度怎么调理？",
+                "现在遇到一个两难的决定，易经怎么看？",
+                "这段感情/婚姻有什么要注意的？",
+                "今年财运怎么样？什么时候有转机？",
             ]
-            quick_cols = st.columns(len(quick_qs))
-            quick_selected = None
-            for i, qq in enumerate(quick_qs):
-                with quick_cols[i]:
-                    if st.button(qq, key=f"quick_{i}", use_container_width=True):
-                        quick_selected = qq
+            qrow1 = st.columns(3)
+            qrow2 = st.columns(3)
+            quick_sent = None
+            for i, qq in enumerate(quick_qs[:3]):
+                with qrow1[i]:
+                    if st.button(qq, key=f"qbtn_{i}", use_container_width=True):
+                        quick_sent = qq
+            for i, qq in enumerate(quick_qs[3:]):
+                with qrow2[i]:
+                    if st.button(qq, key=f"qbtn_{i+3}", use_container_width=True):
+                        quick_sent = qq
 
-            with st.form("chat_form", clear_on_submit=True):
-                user_q = st.text_input(
-                    "或者直接输入你的问题",
-                    placeholder="比如: 我这个命格适合创业吗？",
-                    value=quick_selected if quick_selected else ""
-                )
-                chat_submitted = st.form_submit_button("发送给倪师")
+            # 手动输入
+            user_q = st.text_input("或直接输入你的问题", placeholder="比如: 我这个命格适合创业吗？", key="chat_input")
+            submitted = st.button("发送给倪师", key="chat_submit_btn", use_container_width=True)
 
-                if chat_submitted and user_q:
-                    if remaining <= 0:
-                        st.error("免费次数已用完。反馈后可再得 3 次，或升级付费版。")
-                    else:
-                        with st.spinner("倪师思考中..."):
-                            history_str = "\n".join(["问: {}\n答: {}".format(q,a) for q,a in st.session_state.chat_history[-3:]])
-                            chat_reply = generate_chat(chart_data, name, geju_list, user_q, history_str)
-                        st.session_state.chat_history.append((user_q, chat_reply))
-                        save_chat(st.session_state.user_id, st.session_state.chart_id, user_q, chat_reply)
-                        st.rerun()
+            # 处理发送
+            final_q = quick_sent or (user_q if submitted else None)
+            if final_q:
+                if remaining <= 0:
+                    st.error("免费次数已用完。反馈后可再得 3 次。")
+                else:
+                    with st.spinner("倪师思考中..."):
+                        history_str = "\n".join(["问: {}\n答: {}".format(q,a) for q,a in st.session_state.chat_history[-3:]])
+                        chat_reply = generate_chat(chart_data, name, geju_list, final_q, history_str)
+                    st.session_state.chat_history.append((final_q, chat_reply))
+                    save_chat(st.session_state.user_id, st.session_state.chart_id, final_q, chat_reply)
+                    st.rerun()
+
         else:
             if not st.session_state.feedback_done:
                 st.info("免费对话已用完。在下方填写反馈后可再获得 3 次免费对话。")
@@ -765,9 +844,8 @@ if st.session_state.chart_data is not None:
     with chat_tab2:
         if st.session_state.chat_history:
             for q, a in st.session_state.chat_history:
-                st.markdown("**问: {}**".format(q))
-                st.markdown("**倪师:** {}".format(a))
-                st.markdown("---")
+                with st.chat_message("user"): st.write(q)
+                with st.chat_message("assistant"): st.write(a)
         else:
             st.caption("还没有对话记录。去上面和倪师聊聊吧。")
 

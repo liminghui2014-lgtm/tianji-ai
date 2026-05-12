@@ -15,7 +15,7 @@ def _db() -> Client:
     if _supabase is None:
         import streamlit as st
         url = "https://hzievtwgskweqpdwmrbp.supabase.co"
-        key = "sb_publishable_6__CyQykjVd_sGlTghec-g_a_8mklZV"
+        key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6aWV2dHdnc2t3ZXFwZHdtcmJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1OTE3MzksImV4cCI6MjA5NDE2NzczOX0.1t_YKm_wlKdfYRUH3bXcYMNuaAws5_L9j9OH5hdvC_Q"
         try:
             url = st.secrets.get("SUPABASE_URL", url)
             key = st.secrets.get("SUPABASE_KEY", key)

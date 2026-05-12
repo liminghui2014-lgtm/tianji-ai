@@ -267,7 +267,7 @@ def render_star_chart(chart_data):
         if main_stars == "无" or not main_stars:
             main_stars = '<span style="color:#5a4f3e;font-style:italic;">借对宫</span>'
 
-        cards.append(f"""<div style="background:{bg};border:{border};{ming_glow}border-radius:8px;padding:8px 6px;text-align:center;font-size:10px;line-height:1.5;">
+        cards.append(f"""<div class="cell" style="background:{bg};border:{border};{ming_glow}border-radius:8px;padding:8px 6px;text-align:center;font-size:10px;line-height:1.5;">
         <div style="font-weight:600;color:#c4a870;margin-bottom:2px;font-size:11px;">{p['宫位']}{shen_badge}</div>
         <div style="color:#6b5f4e;font-size:9px;margin-bottom:2px;">{p['天干']}{p['地支']}</div>
         <div style="color:#e8e0d4;font-weight:500;font-size:10px;">{main_stars}</div>
@@ -277,9 +277,30 @@ def render_star_chart(chart_data):
 
     grid = "".join(cards)
     wuxing = chart_data.get("五行局", "")
-    return f"""<div style="font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:100%;overflow-x:auto;margin:16px 0 8px;">
-    <div style="font-size:11px;color:#6b5f4e;letter-spacing:0.06em;margin-bottom:10px;text-align:center;">紫微斗数 · 十二宫 · {wuxing}</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:4px;">{grid}</div>
+    return f"""<div style="font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:100%;margin:8px 0;">
+    <style>
+      .star-chart-grid {{
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+        padding: 2px;
+      }}
+      @media (max-width: 480px) {{
+        .star-chart-grid {{
+          grid-template-columns: repeat(3, 1fr);
+          gap: 3px;
+        }}
+        .star-chart-grid .cell {{
+          padding: 4px 3px !important;
+          font-size: 8px !important;
+        }}
+        .star-chart-grid .cell div {{
+          font-size: 8px !important;
+        }}
+      }}
+    </style>
+    <div style="font-size:10px;color:#6b5f4e;text-align:center;margin-bottom:8px;">紫微斗数 · 十二宫 · {wuxing}</div>
+    <div class="star-chart-grid">{grid}</div>
     </div>"""
 
 def generate_reading(chart_data, name, geju_list):

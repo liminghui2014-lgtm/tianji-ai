@@ -244,7 +244,7 @@ def build_share_card(chart_data, name, geju_list, share_id, reading_text=""):
   </div>"""
 
 def render_star_chart(chart_data):
-    """紫微斗数星盘 — 纯 markdown 表格，不用 unsafe_allow_html"""
+    """紫微斗数星盘 — 精简两行格式"""
     palaces = chart_data.get("命盘", [])
     if not palaces:
         return
@@ -254,22 +254,26 @@ def render_star_chart(chart_data):
     ordered = sorted(palaces, key=lambda p: order_map.get(p["宫位"], 99))
     wuxing = chart_data.get("五行局", "")
 
-    lines = [f"紫微斗数 · 十二宫 · {wuxing}", ""]
-    lines.append("| 命宫 | 兄弟 | 夫妻 | 子女 |")
-    lines.append("|---|---|---|---|")
-    for row in range(3):
-        cells = []
-        for col_idx in range(4):
-            p = ordered[row * 4 + col_idx]
-            ms = p["主星"] if p["主星"] and p["主星"] != "无" else "借"
-            sihua = " " + p.get("四化", "") if p.get("四化", "").strip() else ""
-            label = p['宫位'] + ("身" if p.get("身宫") else "")
-            if p["宫位"] == "命宫":
-                label = f"**{label}**"
-            cells.append(f"{label}<br>{p['天干']}{p['地支']}<br>{ms}{sihua}<br>{p['辅星']}")
-        lines.append("|" + "|".join(cells) + "|")
+    st.caption(f"紫微斗数 · 十二宫 · {wuxing}")
 
-    st.markdown("\n".join(lines))
+    for row in range(3):
+        cols = st.columns(4)
+        for c in range(4):
+            p = ordered[row * 4 + c]
+            ms = p["主星"] if p["主星"] and p["主星"] != "无" else "借"
+            label = p['宫位'] + ("身" if p.get("身宫") else "")
+            sihua = p.get("四化", "")
+            is_ming = p["宫位"] == "命宫"
+
+            # 两行精简格式
+            line1 = f"**{label}** {p['天干']}{p['地支']}" if is_ming else f"{label} {p['天干']}{p['地支']}"
+            line2 = ms
+            if sihua and sihua.strip():
+                line2 += f" · {sihua}"
+            line2 += f"  \n{p['辅星']}"
+
+            with cols[c]:
+                st.caption(line1 + "  \n" + line2)
 
 def generate_reading(chart_data, name, geju_list):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)

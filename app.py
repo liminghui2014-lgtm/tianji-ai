@@ -286,8 +286,9 @@ def generate_reading(chart_data, name, geju_list):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)
     rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=4000)
     basic, geju_text, palace_text = build_chart_summary(chart_data, geju_list)
+    today = datetime.now().strftime("%Y年%m月%d日")
 
-    prompt = """你是天纪派紫微斗数解读师，师承倪海夏先生。你说话的方式像一位阅历丰富、看透世事的前辈——不卖关子、不故弄玄虚、不绕弯子。你说的话每一句都要从命盘来，落到命盘去。
+    prompt = """当前日期：""" + today + """。你是天纪派紫微斗数解读师，师承倪海夏先生。你说话的方式像一位阅历丰富、看透世事的前辈——不卖关子、不故弄玄虚、不绕弯子。你说的话每一句都要从命盘来，落到命盘去。
 
 ## 核心铁律
 
@@ -404,7 +405,8 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
 命宫主星: {ming_main} | 命宫四化: {ming_sihua}
 (上述精要信息已足够回答当前问题, 如需查其他宫位请告知)"""
 
-    system_prompt = """你是天纪派紫微斗数解读师，师承倪海夏先生。{name}正在和你面对面讨论ta的命盘。
+    today = datetime.now().strftime("%Y年%m月%d日")
+    system_prompt = """当前日期：""" + today + """。你是天纪派紫微斗数解读师，师承倪海夏先生。{name}正在和你面对面讨论ta的命盘。
 
 {context}
 

@@ -244,7 +244,7 @@ def build_share_card(chart_data, name, geju_list, share_id, reading_text=""):
   </div>"""
 
 def render_star_chart(chart_data):
-    """生成紫微斗数星盘HTML — 12宫格, 命宫高亮"""
+    """生成紫微斗数星盘HTML — 4×3表格，全平台兼容"""
     palaces = chart_data.get("命盘", [])
     if not palaces:
         return ""
@@ -253,34 +253,33 @@ def render_star_chart(chart_data):
                  "迁移":6,"仆役":7,"官禄":8,"田宅":9,"福德":10,"父母":11}
     ordered = sorted(palaces, key=lambda p: order_map.get(p["宫位"], 99))
 
-    cards = []
-    for p in ordered:
+    def cell(p):
         is_ming = p["宫位"] == "命宫"
         is_shen = p.get("身宫") or False
-        ming_glow = "box-shadow: 0 0 16px rgba(196,168,112,0.6);border:1px solid rgba(196,168,112,0.6);" if is_ming else ""
-        shen_badge = '<span style="font-size:9px;color:#c4a870;margin-left:4px;">身</span>' if is_shen else ""
-        bg = "rgba(196,168,112,0.12)" if is_ming else "rgba(255,255,255,0.04)"
-        border = "1px solid rgba(196,168,112,0.4)" if is_ming else "1px solid rgba(255,255,255,0.06)"
+        shen_badge = '<span style="color:#c4a870;">身</span>' if is_shen else ""
+        bg = "rgba(196,168,112,0.15)" if is_ming else "rgba(255,255,255,0.03)"
+        bd = "1px solid rgba(196,168,112,0.5)" if is_ming else "1px solid rgba(255,255,255,0.06)"
+        main_stars = p["主星"] if p["主星"] and p["主星"] != "无" else "借对宫"
+        main_color = "#e8e0d4" if p["主星"] and p["主星"] != "无" else "#5a4f3e"
         sihua = p.get("四化", "")
+        return f"""<td style="background:{bg};border:{bd};vertical-align:top;padding:6px 4px;text-align:center;width:25%;">
+        <div style="font-weight:600;color:#c4a870;font-size:11px;">{p['宫位']}{shen_badge}</div>
+        <div style="color:#6b5f4e;font-size:8px;">{p['天干']}{p['地支']}</div>
+        <div style="color:{main_color};font-weight:500;font-size:9px;margin-top:2px;">{main_stars}</div>
+        <div style="color:#8b7e6a;font-size:7px;line-height:1.2;">{p['辅星']}</div>
+        {"<div style='color:#a08050;font-size:7px;'>"+sihua+"</div>" if sihua and sihua.strip() else ""}
+        </td>"""
 
-        main_stars = p["主星"]
-        if main_stars == "无" or not main_stars:
-            main_stars = '<span style="color:#5a4f3e;font-style:italic;">借对宫</span>'
+    rows = ""
+    for r in range(3):
+        row_cells = "".join(cell(ordered[r*4 + c]) for c in range(4))
+        rows += f"<tr>{row_cells}</tr>"
 
-        cards.append(f"""<div class="cell" style="background:{bg};border:{border};{ming_glow}border-radius:8px;padding:8px 6px;text-align:center;font-size:10px;line-height:1.5;">
-        <div style="font-weight:600;color:#c4a870;margin-bottom:2px;font-size:11px;">{p['宫位']}{shen_badge}</div>
-        <div style="color:#6b5f4e;font-size:9px;margin-bottom:2px;">{p['天干']}{p['地支']}</div>
-        <div style="color:#e8e0d4;font-weight:500;font-size:10px;">{main_stars}</div>
-        <div style="color:#8b7e6a;font-size:8px;margin-top:1px;line-height:1.3;">{p['辅星']}</div>
-        {"<div style='color:#a08050;font-size:8px;margin-top:2px;'>"+sihua+"</div>" if sihua and sihua.strip() else ""}
-        </div>""")
-
-    grid = "".join(cards)
     wuxing = chart_data.get("五行局", "")
-    return f"""<div style="font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:100%;margin:8px 0;">
-    <div style="font-size:10px;color:#6b5f4e;text-align:center;margin-bottom:8px;">紫微斗数 · 十二宫 · {wuxing}</div>
-    <div class="star-chart-grid">{grid}</div>
-    </div>"""
+    return f"""<table style="width:100%;border-collapse:collapse;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;table-layout:fixed;margin:8px 0;">
+    <tr><td colspan="4" style="text-align:center;color:#6b5f4e;font-size:10px;padding-bottom:6px;">紫微斗数 · 十二宫 · {wuxing}</td></tr>
+    {rows}
+    </table>"""
 
 def generate_reading(chart_data, name, geju_list):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)
@@ -533,19 +532,6 @@ st.markdown("""
   .stChatMessage { background: transparent !important; }
   .stChatMessage [data-testid="stChatMessageContent"] { color: #e8e0d4 !important; }
 
-  .star-chart-grid {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 2px;
-  }
-  @media (max-width: 480px) {
-    .star-chart-grid { gap: 2px; }
-    .star-chart-grid .cell {
-      padding: 3px 1px !important; border-radius: 4px !important;
-    }
-    .star-chart-grid .cell div {
-      font-size: 7px !important; line-height: 1.2 !important;
-    }
-    .star-chart-grid .cell div:first-child { font-size: 9px !important; }
-  }
   @media (max-width: 768px) {
     .stApp { padding: 0.8rem !important; }
     h1 { font-size: 1.2rem !important; }

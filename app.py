@@ -244,35 +244,23 @@ def build_share_card(chart_data, name, geju_list, share_id, reading_text=""):
   </div>"""
 
 def render_star_chart(chart_data):
-    """紫微斗数星盘 — Streamlit columns，纯文本"""
     palaces = chart_data.get("命盘", [])
     if not palaces:
-        return
-
+        return ""
     order_map = {"命宫":0,"兄弟":1,"夫妻":2,"子女":3,"财帛":4,"疾厄":5,
                  "迁移":6,"仆役":7,"官禄":8,"田宅":9,"福德":10,"父母":11}
     ordered = sorted(palaces, key=lambda p: order_map.get(p["宫位"], 99))
     wuxing = chart_data.get("五行局", "")
-
-    st.caption(f"紫微斗数 · 十二宫 · {wuxing}")
-
-    for row in range(3):
-        cols = st.columns(4, gap="small")
-        for c in range(4):
-            p = ordered[row * 4 + c]
-            is_ming = p["宫位"] == "命宫"
-            label = p["宫位"] + ("身" if p.get("身宫") else "")
-            ms = p["主星"] if p["主星"] and p["主星"] != "无" else "借"
-            sihua = " · " + p.get("四化", "") if p.get("四化", "").strip() else ""
-            fuxing = p["辅星"]
-
-            if is_ming:
-                text = f"**{label}**  \n{p['天干']}{p['地支']}  \n{ms}{sihua}  \n{fuxing}"
-            else:
-                text = f"{label}  \n{p['天干']}{p['地支']}  \n{ms}{sihua}  \n{fuxing}"
-
-            with cols[c]:
-                st.write(text)
+    cards = []
+    for p in ordered:
+        is_ming = p["宫位"] == "命宫"
+        shen = "身" if p.get("身宫") else ""
+        bg = "#3d2e1a" if is_ming else "#1f1a2e"
+        bd = "#c4a870" if is_ming else "#333"
+        ms = p["主星"] if p["主星"] and p["主星"] != "无" else "借对宫"
+        sihua = p.get("四化", "")
+        cards.append(f'<div style="background:{bg};border:1px solid {bd};border-radius:6px;padding:6px 4px;text-align:center;font-size:10px;line-height:1.4;"><b style="color:#c4a870">{p["宫位"]}{shen}</b><br><span style="color:#888;font-size:8px">{p["天干"]}{p["地支"]}</span><br><span style="color:#e8e0d4;font-size:9px">{ms}</span><br><span style="color:#8b7e6a;font-size:7px">{p["辅星"]}</span>' + (f'<br><span style="color:#a08050;font-size:7px">{sihua}</span>' if sihua and sihua.strip() else "") + '</div>')
+    return f'<div style="max-width:100%;margin:8px 0;font-family:sans-serif;"><div style="text-align:center;color:#6b5f4e;font-size:10px;margin-bottom:6px;">紫微斗数 · 十二宫 · {wuxing}</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">' + "".join(cards) + '</div></div>'
 
 def generate_reading(chart_data, name, geju_list):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)
@@ -752,8 +740,8 @@ if st.session_state.chart_data is not None:
             </div>
             """, unsafe_allow_html=True)
 
-    # 星盘 — 纯 Streamlit columns，不用任何 HTML
-    render_star_chart(chart_data)
+    # 星盘
+    st.components.v1.html(render_star_chart(chart_data), height=380, scrolling=False)
 
     st.markdown("---")
     st.markdown(reading)

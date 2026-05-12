@@ -278,27 +278,6 @@ def render_star_chart(chart_data):
     grid = "".join(cards)
     wuxing = chart_data.get("五行局", "")
     return f"""<div style="font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:100%;margin:8px 0;">
-    <style>
-      .star-chart-grid {{
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 4px;
-        padding: 2px;
-      }}
-      @media (max-width: 480px) {{
-        .star-chart-grid {{
-          grid-template-columns: repeat(3, 1fr);
-          gap: 3px;
-        }}
-        .star-chart-grid .cell {{
-          padding: 4px 3px !important;
-          font-size: 8px !important;
-        }}
-        .star-chart-grid .cell div {{
-          font-size: 8px !important;
-        }}
-      }}
-    </style>
     <div style="font-size:10px;color:#6b5f4e;text-align:center;margin-bottom:8px;">紫微斗数 · 十二宫 · {wuxing}</div>
     <div class="star-chart-grid">{grid}</div>
     </div>"""
@@ -554,6 +533,14 @@ st.markdown("""
   .stChatMessage { background: transparent !important; }
   .stChatMessage [data-testid="stChatMessageContent"] { color: #e8e0d4 !important; }
 
+  .star-chart-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 2px;
+  }
+  @media (max-width: 480px) {
+    .star-chart-grid { grid-template-columns: repeat(3, 1fr); gap: 3px; }
+    .star-chart-grid .cell { padding: 4px 3px !important; }
+    .star-chart-grid .cell div { font-size: 8px !important; }
+  }
   @media (max-width: 768px) {
     .stApp { padding: 0.8rem !important; }
     h1 { font-size: 1.2rem !important; }
@@ -779,9 +766,9 @@ if st.session_state.chart_data is not None:
             </div>
             """, unsafe_allow_html=True)
 
-    # 星盘 — 直接显示
+    # 星盘 — 用 markdown 渲染，不用 iframe（手机端兼容）
     chart_html = render_star_chart(chart_data)
-    st.components.v1.html(chart_html, height=420, scrolling=True)
+    st.markdown(chart_html, unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown(reading)

@@ -403,8 +403,8 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
         name=name, context=context_block,
     )
 
-    user_msg = "之前聊过的内容：\n{history}\n\n---\n{name}现在问: {q}\n\n请倪师基于{name}的完整命盘，做一个深度的、全方位的解读。要具体、要敢说、要让人听完觉得值了。".format(
-        history=chat_history, name=name, q=user_question)
+    user_msg = "【注意：今年是{today}，不是2024年。回答时必须基于{today}来推算时间。】\n\n之前聊过的内容：\n{history}\n\n---\n{name}现在问: {q}\n\n请倪师基于{name}的完整命盘，做一个深度的、全方位的解读。要具体、要敢说、要让人听完觉得值了。".format(
+        today=today, history=chat_history, name=name, q=user_question)
 
     response = client.messages.create(
         model=API_MODEL_FAST, max_tokens=4096, temperature=0.3,
@@ -741,7 +741,7 @@ if st.session_state.chart_data is not None:
             """, unsafe_allow_html=True)
 
     # 星盘
-    st.components.v1.html(render_star_chart(chart_data), height=380, scrolling=False)
+    st.html(render_star_chart(chart_data))
 
     st.markdown("---")
     st.markdown(reading)

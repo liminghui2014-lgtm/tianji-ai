@@ -249,7 +249,7 @@ def render_star_chart(chart_data):
 
 def generate_reading(chart_data, name, geju_list):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)
-    rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=2500)
+    rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=4000)
     basic, geju_text, palace_text = build_chart_summary(chart_data, geju_list)
 
     prompt = """你是天纪派紫微斗数解读师，师承倪海夏先生。你说话的方式像一位阅历丰富、看透世事的前辈——不卖关子、不故弄玄虚、不绕弯子。你说的话每一句都要从命盘来，落到命盘去。
@@ -320,7 +320,8 @@ def generate_reading(chart_data, name, geju_list):
     )
 
     response = client.messages.create(
-        model=API_MODEL, max_tokens=2500, temperature=0.3,
+        model=API_MODEL, max_tokens=4096, temperature=0.3,
+        thinking={"type": "disabled"},
         messages=[{"role": "user", "content": prompt}],
     )
     for block in response.content:
@@ -335,7 +336,7 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
     # 上下文压缩: 首轮传完整命盘，后续对话传精简画像
     if not chat_history or len(chat_history) < 200:
         # 首轮: 完整数据
-        rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=2000)
+        rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=4000)
         basic, geju_text, palace_text = build_chart_summary(chart_data, geju_list)
         context_block = """## {name}的命盘
 
@@ -389,7 +390,8 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
         history=chat_history, name=name, q=user_question)
 
     response = client.messages.create(
-        model=API_MODEL, max_tokens=2000, temperature=0.3,
+        model=API_MODEL, max_tokens=4096, temperature=0.3,
+        thinking={"type": "disabled"},
         system=system_prompt,
         messages=[{"role": "user", "content": user_msg}],
     )

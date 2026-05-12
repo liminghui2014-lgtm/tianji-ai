@@ -4,18 +4,24 @@
 import json
 import hashlib
 from datetime import datetime
-import streamlit as st
 from supabase import create_client, Client
 
-# Supabase 初始化
-_url = st.secrets.get("SUPABASE_URL", "") or "https://hzievtwgskweqpdwmrnp.supabase.co"
-_key = st.secrets.get("SUPABASE_KEY", "") or "sb_publishable_6__CyQykjVd_sGlTghec-g_a_8mklZV"
-_supabase: Client = create_client(_url, _key)
+# Supabase 初始化（延迟到首次调用，避免 import 时 st.secrets 不可用）
+_supabase: Client = None
 
 
 def _db() -> Client:
+    global _supabase
     if _supabase is None:
-        raise RuntimeError("Supabase 未配置")
+        import streamlit as st
+        url = "https://hzievtwgskweqpdwmrnp.supabase.co"
+        key = "sb_publishable_6__CyQykjVd_sGlTghec-g_a_8mklZV"
+        try:
+            url = st.secrets.get("SUPABASE_URL", url)
+            key = st.secrets.get("SUPABASE_KEY", key)
+        except Exception:
+            pass
+        _supabase = create_client(url, key)
     return _supabase
 
 

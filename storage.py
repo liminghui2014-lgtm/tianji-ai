@@ -14,7 +14,7 @@ def _db() -> Client:
     global _supabase
     if _supabase is None:
         import streamlit as st
-        url = "https://hzievtwgskweqpdwmrnp.supabase.co"
+        url = "https://hzievtwgskweqpdwmrbp.supabase.co"
         key = "sb_publishable_6__CyQykjVd_sGlTghec-g_a_8mklZV"
         try:
             url = st.secrets.get("SUPABASE_URL", url)

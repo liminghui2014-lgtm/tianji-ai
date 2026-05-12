@@ -758,9 +758,9 @@ if st.session_state.chart_data is not None:
             </div>
             """, unsafe_allow_html=True)
 
-    # 星盘
+    # 星盘 — markdown内联渲染，不走iframe
     chart_html = render_star_chart(chart_data)
-    st.components.v1.html(chart_html, height=500, scrolling=True)
+    st.markdown(chart_html, unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown(reading)

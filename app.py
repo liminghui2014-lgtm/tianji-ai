@@ -537,9 +537,14 @@ st.markdown("""
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 2px;
   }
   @media (max-width: 480px) {
-    .star-chart-grid { grid-template-columns: repeat(3, 1fr); gap: 3px; }
-    .star-chart-grid .cell { padding: 4px 3px !important; }
-    .star-chart-grid .cell div { font-size: 8px !important; }
+    .star-chart-grid { gap: 2px; }
+    .star-chart-grid .cell {
+      padding: 3px 1px !important; border-radius: 4px !important;
+    }
+    .star-chart-grid .cell div {
+      font-size: 7px !important; line-height: 1.2 !important;
+    }
+    .star-chart-grid .cell div:first-child { font-size: 9px !important; }
   }
   @media (max-width: 768px) {
     .stApp { padding: 0.8rem !important; }

@@ -244,42 +244,32 @@ def build_share_card(chart_data, name, geju_list, share_id, reading_text=""):
   </div>"""
 
 def render_star_chart(chart_data):
-    """生成紫微斗数星盘HTML — 4×3表格，全平台兼容"""
+    """紫微斗数星盘 — 纯 markdown 表格，不用 unsafe_allow_html"""
     palaces = chart_data.get("命盘", [])
     if not palaces:
-        return ""
+        return
 
     order_map = {"命宫":0,"兄弟":1,"夫妻":2,"子女":3,"财帛":4,"疾厄":5,
                  "迁移":6,"仆役":7,"官禄":8,"田宅":9,"福德":10,"父母":11}
     ordered = sorted(palaces, key=lambda p: order_map.get(p["宫位"], 99))
-
-    def cell(p):
-        is_ming = p["宫位"] == "命宫"
-        is_shen = p.get("身宫") or False
-        shen_badge = '<span style="color:#c4a870;">身</span>' if is_shen else ""
-        bg = "rgba(196,168,112,0.15)" if is_ming else "rgba(255,255,255,0.03)"
-        bd = "1px solid rgba(196,168,112,0.5)" if is_ming else "1px solid rgba(255,255,255,0.06)"
-        main_stars = p["主星"] if p["主星"] and p["主星"] != "无" else "借对宫"
-        main_color = "#e8e0d4" if p["主星"] and p["主星"] != "无" else "#5a4f3e"
-        sihua = p.get("四化", "")
-        return f"""<td style="background:{bg};border:{bd};vertical-align:top;padding:6px 4px;text-align:center;width:25%;">
-        <div style="font-weight:600;color:#c4a870;font-size:11px;">{p['宫位']}{shen_badge}</div>
-        <div style="color:#6b5f4e;font-size:8px;">{p['天干']}{p['地支']}</div>
-        <div style="color:{main_color};font-weight:500;font-size:9px;margin-top:2px;">{main_stars}</div>
-        <div style="color:#8b7e6a;font-size:7px;line-height:1.2;">{p['辅星']}</div>
-        {"<div style='color:#a08050;font-size:7px;'>"+sihua+"</div>" if sihua and sihua.strip() else ""}
-        </td>"""
-
-    rows = ""
-    for r in range(3):
-        row_cells = "".join(cell(ordered[r*4 + c]) for c in range(4))
-        rows += f"<tr>{row_cells}</tr>"
-
     wuxing = chart_data.get("五行局", "")
-    return f"""<table style="width:100%;border-collapse:collapse;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;table-layout:fixed;margin:8px 0;">
-    <tr><td colspan="4" style="text-align:center;color:#6b5f4e;font-size:10px;padding-bottom:6px;">紫微斗数 · 十二宫 · {wuxing}</td></tr>
-    {rows}
-    </table>"""
+
+    lines = [f"紫微斗数 · 十二宫 · {wuxing}", ""]
+    lines.append("| 命宫 | 兄弟 | 夫妻 | 子女 |")
+    lines.append("|---|---|---|---|")
+    for row in range(3):
+        cells = []
+        for col_idx in range(4):
+            p = ordered[row * 4 + col_idx]
+            ms = p["主星"] if p["主星"] and p["主星"] != "无" else "借"
+            sihua = " " + p.get("四化", "") if p.get("四化", "").strip() else ""
+            label = p['宫位'] + ("身" if p.get("身宫") else "")
+            if p["宫位"] == "命宫":
+                label = f"**{label}**"
+            cells.append(f"{label}<br>{p['天干']}{p['地支']}<br>{ms}{sihua}<br>{p['辅星']}")
+        lines.append("|" + "|".join(cells) + "|")
+
+    st.markdown("\n".join(lines))
 
 def generate_reading(chart_data, name, geju_list):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)
@@ -757,9 +747,8 @@ if st.session_state.chart_data is not None:
             </div>
             """, unsafe_allow_html=True)
 
-    # 星盘 — 用 markdown 渲染，不用 iframe（手机端兼容）
-    chart_html = render_star_chart(chart_data)
-    st.markdown(chart_html, unsafe_allow_html=True)
+    # 星盘
+    render_star_chart(chart_data)
 
     st.markdown("---")
     st.markdown(reading)

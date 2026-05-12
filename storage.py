@@ -96,6 +96,16 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_readings_user ON readings(user_id);
         CREATE INDEX IF NOT EXISTS idx_chats_user ON chats(user_id);
         CREATE INDEX IF NOT EXISTS idx_analytics_event ON analytics(event_type);
+
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
+            chart_id INTEGER REFERENCES charts(id),
+            feedback_useful INTEGER,  -- 1=有用, 0=不太准
+            feedback_wtp TEXT,         -- 付费意愿: "19.9"/"29.9"/"49.9"/"no"
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id);
     """)
     conn.commit()
     conn.close()
@@ -185,6 +195,31 @@ def load_chat_history(user_id, chart_id, limit=20):
     """, (user_id, chart_id, limit)).fetchall()
     conn.close()
     return [(r["question"], r["answer"]) for r in reversed(rows)]
+
+
+# ═══════════════════════════════════════════════════════════════
+# 反馈
+# ═══════════════════════════════════════════════════════════════
+
+def save_feedback(user_id, chart_id, useful=None, wtp=None):
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO feedback (user_id, chart_id, feedback_useful, feedback_wtp)
+        VALUES (?, ?, ?, ?)
+    """, (user_id, chart_id, useful, wtp))
+    conn.commit()
+    conn.close()
+
+def get_feedback_stats():
+    conn = get_db()
+    total = conn.execute("SELECT COUNT(*) as n FROM feedback").fetchone()["n"]
+    useful_count = conn.execute("SELECT COUNT(*) as n FROM feedback WHERE feedback_useful=1").fetchone()["n"]
+    wtp_rows = conn.execute("""
+        SELECT feedback_wtp, COUNT(*) as n FROM feedback
+        WHERE feedback_wtp IS NOT NULL GROUP BY feedback_wtp ORDER BY n DESC
+    """).fetchall()
+    conn.close()
+    return {"total": total, "useful": useful_count, "wtp": {r["feedback_wtp"]: r["n"] for r in wtp_rows}}
 
 
 # ═══════════════════════════════════════════════════════════════

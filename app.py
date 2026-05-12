@@ -14,7 +14,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from anthropic import Anthropic
 from geju_detect import detect_geju
-from storage import save_user, save_chart_and_reading, save_chat, load_chat_history, get_stats, consume_free_chat, get_remaining_free_chats
+from storage import save_user, save_chart_and_reading, save_chat, load_chat_history, get_stats, consume_free_chat, get_remaining_free_chats, save_feedback, get_feedback_stats
 
 BASE_DIR = Path(__file__).parent
 CALCULATOR = BASE_DIR / "chart_calculator.js"
@@ -418,14 +418,17 @@ st.markdown("""
   .stApp > footer { background: transparent !important; }
 
   /* 全局文字 */
-  html, body, p, span, div, label, input, select, textarea {
+  .stApp, .stMarkdown, .stMarkdown p, .stMarkdown li {
     font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif !important;
-    color: #e8e0d4;
+    line-height: 1.7 !important;
   }
+  .stApp { color: #e8e0d4 !important; }
+  .stMarkdown p, .stMarkdown li, .stMarkdown div { color: #e8e0d4 !important; line-height: 1.7 !important; }
+  p, li { line-height: 1.7 !important; color: #e8e0d4 !important; }
 
-  h1 { color: #f0e6d2 !important; font-weight: 300 !important; letter-spacing: 0.04em !important; }
-  h2 { color: #d4c8b0 !important; font-weight: 400 !important; font-size: 1.1rem !important; }
-  h3 { color: #c4a870 !important; font-weight: 400 !important; font-size: 0.9rem !important; letter-spacing: 0.06em !important; text-transform: uppercase; }
+  h1 { color: #f0e6d2 !important; font-weight: 300 !important; letter-spacing: 0.04em !important; line-height: 1.3 !important; }
+  h2 { color: #d4c8b0 !important; font-weight: 400 !important; font-size: 1.1rem !important; line-height: 1.4 !important; }
+  h3 { color: #c4a870 !important; font-weight: 400 !important; font-size: 0.9rem !important; letter-spacing: 0.06em !important; }
 
   /* Cards */
   .card {
@@ -442,14 +445,16 @@ st.markdown("""
     background: rgba(255,255,255,0.06) !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
     border-radius: 8px !important;
-    color: #e8e0d4 !important;
+    color: #e8e0d4 !important; line-height: 1.4 !important;
   }
   .stDateInput > div > div > input {
     background: rgba(255,255,255,0.06) !important;
     border: 1px solid rgba(255,255,255,0.12) !important;
     border-radius: 8px !important;
-    color: #e8e0d4 !important;
+    color: #e8e0d4 !important; line-height: 1.4 !important;
   }
+  .stApp label { line-height: 1.5 !important; }
+  .stTextInput input, .stSelectbox select { line-height: 1.4 !important; min-height: 38px !important; }
   .stFormSubmitButton button {
     background: linear-gradient(135deg, #8b6914, #c4a870) !important;
     border: none !important;
@@ -508,6 +513,34 @@ for key in ["chart_data","reading","geju_list","name","chat_history",
     if key not in st.session_state:
         st.session_state[key] = None if key != "chat_history" else []
 
+# ── 分享链接路由：?chart_id=xxx 直接加载已有命盘 ──
+qp = st.query_params
+cid = qp.get("chart_id")
+if cid and st.session_state.chart_data is None:
+    try:
+        cid_int = int(cid)
+        import sqlite3
+        conn = sqlite3.connect(str(BASE_DIR / "tianji.db"))
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("""
+            SELECT charts.chart_json, readings.ai_reading, charts.geju_list, users.name
+            FROM charts
+            JOIN readings ON readings.chart_id = charts.id
+            JOIN users ON users.id = charts.user_id
+            WHERE charts.id = ?
+        """, (cid_int,)).fetchone()
+        conn.close()
+        if row:
+            st.session_state.chart_data = json.loads(row["chart_json"])
+            st.session_state.reading = row["ai_reading"]
+            st.session_state.geju_list = json.loads(row["geju_list"]) if row["geju_list"] else []
+            st.session_state.name = row["name"]
+            st.session_state.chart_id = cid_int
+            st.session_state.user_id = None
+            st.session_state.chat_history = []
+    except Exception:
+        pass
+
 st.markdown("""
 <div style="text-align:center;padding:20px 0 10px;">
   <div style="font-size:2.4rem;margin-bottom:4px;">🔮</div>
@@ -515,6 +548,27 @@ st.markdown("""
   <p style="color:#8b7e6a;font-size:0.85rem;letter-spacing:0.06em;">紫微斗数 · 倪海夏天纪体系 · AI解读</p>
 </div>
 """, unsafe_allow_html=True)
+
+# RAG vs 普通AI介绍 — 直接展示，不在 expander 里
+st.markdown("""
+<div style="
+  background: rgba(196,168,112,0.08);
+  border: 1px solid rgba(196,168,112,0.2);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin: 0 0 20px 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+">
+<strong style="color:#c4a870;">天纪 AI vs 普通大语言模型</strong><br><br>
+<strong>普通 AI（豆包 / ChatGPT / Kimi）：</strong><br>
+能聊紫微斗数的术语，但容易张冠李戴——把天机星当成天府星、把 "杀破狼" 说成 "七杀破军天狼"。没有倪海夏的语言指纹——像一个在背维基百科的学生。<br><br>
+<strong>天纪 AI 的 RAG 架构：</strong><br>
+87 万字倪海夏《天纪》字幕语料作为知识库。解读时先检索倪师原话，再用 AI 以倪师的思维框架和语言风格生成解读。每条判断锚定在倪师的真实语境中——不是 AI "想象" 倪海夏会怎么说，是从原文中检索倪师真实说过的话。<br><br>
+<strong>这就像：</strong>普通 AI 是一个读了几本紫微斗数百科的人在和你说命盘；天纪 AI 是倪师本人在看你的盘——他的原话、他的思维、他的分寸。
+</div>
+""", unsafe_allow_html=True)
+
 st.markdown("---")
 
 with st.form("input_form"):
@@ -674,7 +728,34 @@ if st.session_state.chart_data is not None:
         else:
             st.caption("还没有对话记录")
 
-    st.markdown(f'<div style="text-align:center;color:#6b5f4e;font-size:0.7rem;padding:8px;">截图分享给朋友一起探索</div>', unsafe_allow_html=True)
+    # 分享链接
+    share_url = f"{st.query_params.get('_', '')}?chart_id={st.session_state.chart_id}"
+    st.markdown(f'<div style="text-align:center;color:#6b5f4e;font-size:0.7rem;padding:8px;">分享链接：<code>?chart_id={st.session_state.chart_id}</code><br>截图或复制链接发给朋友一起探索</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # 反馈
+    st.markdown("### 这个解读对你有用吗？")
+    fc1, fc2 = st.columns(2)
+    with fc1:
+        if st.button("👍 有用", key="tianji_useful", use_container_width=True):
+            if st.session_state.user_id and st.session_state.chart_id:
+                save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=1)
+            st.success("感谢反馈")
+    with fc2:
+        if st.button("👎 不太准", key="tianji_not_useful", use_container_width=True):
+            if st.session_state.user_id and st.session_state.chart_id:
+                save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=0)
+            st.info("我们会持续优化")
+
+    st.markdown('<p style="margin-top:16px;font-size:0.85rem;">如果可以无限量与倪师对话 + 解锁大限流年 + 合盘解读，你愿意付多少钱？</p>', unsafe_allow_html=True)
+    pcols = st.columns(4)
+    for i, price in enumerate(["19.9", "49.9", "99", "不愿意"]):
+        with pcols[i]:
+            if st.button(price, key=f"tianji_wtp_{i}", use_container_width=True):
+                if st.session_state.user_id and st.session_state.chart_id:
+                    save_feedback(st.session_state.user_id, st.session_state.chart_id, wtp=price)
+                st.success("已记录")
 
     with st.expander("查看命盘数据"):
         st.json(chart_data)

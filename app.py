@@ -249,7 +249,7 @@ def render_star_chart(chart_data):
 
 def generate_reading(chart_data, name, geju_list):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)
-    rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=6000)
+    rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=2500)
     basic, geju_text, palace_text = build_chart_summary(chart_data, geju_list)
 
     prompt = """你是天纪派紫微斗数解读师，师承倪海夏先生。你说话的方式像一位阅历丰富、看透世事的前辈——不卖关子、不故弄玄虚、不绕弯子。你说的话每一句都要从命盘来，落到命盘去。
@@ -320,7 +320,7 @@ def generate_reading(chart_data, name, geju_list):
     )
 
     response = client.messages.create(
-        model=API_MODEL, max_tokens=4096, temperature=0.3,
+        model=API_MODEL, max_tokens=2500, temperature=0.3,
         messages=[{"role": "user", "content": prompt}],
     )
     for block in response.content:
@@ -335,7 +335,7 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
     # 上下文压缩: 首轮传完整命盘，后续对话传精简画像
     if not chat_history or len(chat_history) < 200:
         # 首轮: 完整数据
-        rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=8000)
+        rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=2000)
         basic, geju_text, palace_text = build_chart_summary(chart_data, geju_list)
         context_block = """## {name}的命盘
 
@@ -389,7 +389,7 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
         history=chat_history, name=name, q=user_question)
 
     response = client.messages.create(
-        model=API_MODEL, max_tokens=4096, temperature=0.3,
+        model=API_MODEL, max_tokens=2000, temperature=0.3,
         system=system_prompt,
         messages=[{"role": "user", "content": user_msg}],
     )
@@ -546,6 +546,7 @@ st.markdown("""
   <div style="font-size:2.4rem;margin-bottom:4px;">🔮</div>
   <h1 style="font-size:2rem;margin-bottom:4px;">天纪</h1>
   <p style="color:#8b7e6a;font-size:0.85rem;letter-spacing:0.06em;">紫微斗数 · 倪海夏天纪体系 · AI解读</p>
+  <p style="color:#c4a870;font-size:0.8rem;margin-top:8px;">与倪师面对面聊你的命盘 —— 不是冷冰冰的报告，是对话。</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -692,23 +693,60 @@ if st.session_state.chart_data is not None:
     st.markdown("---")
     if "share_id" not in st.session_state or st.session_state.share_id is None:
         st.session_state.share_id = ''.join(random.choices('0123456789abcdef', k=6))
-    share_html = build_share_card(chart_data, name, geju_list, st.session_state.share_id, reading)
-    st.components.v1.html(share_html, height=350, scrolling=True)
 
+    # ── 与倪师对话（核心差异化，放在解读后最显眼位置）──
     st.markdown("---")
-    st.markdown('<div style="font-size:0.9rem;color:#c4a870;letter-spacing:0.06em;margin-bottom:12px;">与倪师对话</div>', unsafe_allow_html=True)
-    chat_tab1, chat_tab2 = st.tabs(["免费体验", "对话记录"])
+    st.markdown("""
+    <div style="background:rgba(196,168,112,0.1);border:1px solid rgba(196,168,112,0.3);border-radius:12px;padding:20px 24px;margin-bottom:12px;text-align:center;">
+      <h3 style="color:#c4a870;margin:0 0 4px;">与倪师对话</h3>
+      <p style="color:#b0a090;font-size:0.85rem;margin:0;">这不是一份冷冰冰的报告。这是倪海夏在和你面对面聊你的命盘。<br>追问他任何问题——他就像真的坐在你面前看你的盘。</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 免费次数逻辑：基础2次 + 反馈后+3次
+    if "chat_bonus" not in st.session_state:
+        st.session_state.chat_bonus = 0
+    if "feedback_done" not in st.session_state:
+        st.session_state.feedback_done = False
+
+    base_free = 2
+    total_free = base_free + st.session_state.chat_bonus
+    used = len([1 for q, a in st.session_state.chat_history if q != "__system__"])
+    remaining = total_free - used
+
+    chat_tab1, chat_tab2 = st.tabs(["与倪师对话", "对话记录"])
 
     with chat_tab1:
-        remaining = get_remaining_free_chats(st.session_state.user_id, st.session_state.chart_id)
         if remaining > 0:
-            st.caption("免费对话剩余 {} 次".format(remaining))
+            st.caption("免费对话剩余 {} 次（反馈后可再得 3 次）".format(remaining))
+
+            # 快捷问题按钮
+            st.markdown('<p style="font-size:0.8rem;color:#8b7e6a;margin:8px 0 4px;">常用问题（点击直接发送）：</p>', unsafe_allow_html=True)
+            quick_qs = [
+                "我这个命适合创业还是打工？",
+                "我的财运怎么样？什么时候有转机？",
+                "感情和婚姻方面有什么要注意的？",
+                "今年事业上有什么机会和坑？",
+                "我的健康有什么隐患吗？",
+            ]
+            quick_cols = st.columns(len(quick_qs))
+            quick_selected = None
+            for i, qq in enumerate(quick_qs):
+                with quick_cols[i]:
+                    if st.button(qq, key=f"quick_{i}", use_container_width=True):
+                        quick_selected = qq
+
             with st.form("chat_form", clear_on_submit=True):
-                user_q = st.text_input("想问倪师什么?", placeholder="比如: 我这个命格适合创业吗?")
-                chat_submitted = st.form_submit_button("问倪师")
+                user_q = st.text_input(
+                    "或者直接输入你的问题",
+                    placeholder="比如: 我这个命格适合创业吗？",
+                    value=quick_selected if quick_selected else ""
+                )
+                chat_submitted = st.form_submit_button("发送给倪师")
+
                 if chat_submitted and user_q:
-                    if not consume_free_chat(st.session_state.user_id, st.session_state.chart_id):
-                        st.error("免费次数已用完，请升级付费版继续对话")
+                    if remaining <= 0:
+                        st.error("免费次数已用完。反馈后可再得 3 次，或升级付费版。")
                     else:
                         with st.spinner("倪师思考中..."):
                             history_str = "\n".join(["问: {}\n答: {}".format(q,a) for q,a in st.session_state.chat_history[-3:]])
@@ -717,7 +755,10 @@ if st.session_state.chart_data is not None:
                         save_chat(st.session_state.user_id, st.session_state.chart_id, user_q, chat_reply)
                         st.rerun()
         else:
-            st.info("免费体验已用完。升级付费版即可无限对话，含大限流年解读、合盘、流月运势。")
+            if not st.session_state.feedback_done:
+                st.info("免费对话已用完。在下方填写反馈后可再获得 3 次免费对话。")
+            else:
+                st.info("免费对话已用完。升级付费版即可无限对话，含大限流年解读、合盘、流月运势。")
 
     with chat_tab2:
         if st.session_state.chat_history:
@@ -726,27 +767,37 @@ if st.session_state.chart_data is not None:
                 st.markdown("**倪师:** {}".format(a))
                 st.markdown("---")
         else:
-            st.caption("还没有对话记录")
+            st.caption("还没有对话记录。去上面和倪师聊聊吧。")
 
-    # 分享链接
+    # ── 分享卡片 ──
+    st.markdown("---")
+    share_html = build_share_card(chart_data, name, geju_list, st.session_state.share_id, reading)
+    st.components.v1.html(share_html, height=350, scrolling=True)
+
     share_url = f"{st.query_params.get('_', '')}?chart_id={st.session_state.chart_id}"
     st.markdown(f'<div style="text-align:center;color:#6b5f4e;font-size:0.7rem;padding:8px;">分享链接：<code>?chart_id={st.session_state.chart_id}</code><br>截图或复制链接发给朋友一起探索</div>', unsafe_allow_html=True)
 
     st.markdown("---")
 
-    # 反馈
+    # ── 反馈（填完后送3次对话）──
     st.markdown("### 这个解读对你有用吗？")
-    fc1, fc2 = st.columns(2)
+    fc1, fc2, fc3 = st.columns(3)
     with fc1:
-        if st.button("👍 有用", key="tianji_useful", use_container_width=True):
+        if st.button("有用", key="tianji_useful", use_container_width=True):
             if st.session_state.user_id and st.session_state.chart_id:
                 save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=1)
-            st.success("感谢反馈")
+            if not st.session_state.feedback_done:
+                st.session_state.chat_bonus = 3
+                st.session_state.feedback_done = True
+            st.success("感谢反馈！已获得 3 次额外免费对话")
     with fc2:
-        if st.button("👎 不太准", key="tianji_not_useful", use_container_width=True):
+        if st.button("不太准", key="tianji_not_useful", use_container_width=True):
             if st.session_state.user_id and st.session_state.chart_id:
                 save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=0)
-            st.info("我们会持续优化")
+            if not st.session_state.feedback_done:
+                st.session_state.chat_bonus = 3
+                st.session_state.feedback_done = True
+            st.success("感谢反馈！已获得 3 次额外免费对话")
 
     st.markdown('<p style="margin-top:16px;font-size:0.85rem;">如果可以无限量与倪师对话 + 解锁大限流年 + 合盘解读，你愿意付多少钱？</p>', unsafe_allow_html=True)
     pcols = st.columns(4)
@@ -755,7 +806,10 @@ if st.session_state.chart_data is not None:
             if st.button(price, key=f"tianji_wtp_{i}", use_container_width=True):
                 if st.session_state.user_id and st.session_state.chart_id:
                     save_feedback(st.session_state.user_id, st.session_state.chart_id, wtp=price)
-                st.success("已记录")
+                if not st.session_state.feedback_done:
+                    st.session_state.chat_bonus = 3
+                    st.session_state.feedback_done = True
+                st.success("已记录，已获得 3 次额外免费对话")
 
     with st.expander("查看命盘数据"):
         st.json(chart_data)

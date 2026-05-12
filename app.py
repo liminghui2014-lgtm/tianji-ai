@@ -14,12 +14,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from anthropic import Anthropic
 from geju_detect import detect_geju
-from storage import save_user, save_chart_and_reading, save_chat, load_chat_history, get_stats, consume_free_chat, get_remaining_free_chats
-try:
-    from storage import save_feedback, get_feedback_stats
-except ImportError:
-    save_feedback = None
-    get_feedback_stats = None
+from storage import save_user, save_chart_and_reading, save_chat, load_chat_history, get_stats, consume_free_chat, get_remaining_free_chats, save_feedback, get_feedback_stats
 
 BASE_DIR = Path(__file__).parent
 CALCULATOR = BASE_DIR / "chart_calculator.js"
@@ -745,12 +740,12 @@ if st.session_state.chart_data is not None:
     with fc1:
         if st.button("👍 有用", key="tianji_useful", use_container_width=True):
             if st.session_state.user_id and st.session_state.chart_id:
-                if save_feedback: save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=1)
+                save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=1)
             st.success("感谢反馈")
     with fc2:
         if st.button("👎 不太准", key="tianji_not_useful", use_container_width=True):
             if st.session_state.user_id and st.session_state.chart_id:
-                if save_feedback: save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=0)
+                save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=0)
             st.info("我们会持续优化")
 
     st.markdown('<p style="margin-top:16px;font-size:0.85rem;">如果可以无限量与倪师对话 + 解锁大限流年 + 合盘解读，你愿意付多少钱？</p>', unsafe_allow_html=True)
@@ -759,7 +754,7 @@ if st.session_state.chart_data is not None:
         with pcols[i]:
             if st.button(price, key=f"tianji_wtp_{i}", use_container_width=True):
                 if st.session_state.user_id and st.session_state.chart_id:
-                    if save_feedback: save_feedback(st.session_state.user_id, st.session_state.chart_id, wtp=price)
+                    save_feedback(st.session_state.user_id, st.session_state.chart_id, wtp=price)
                 st.success("已记录")
 
     with st.expander("查看命盘数据"):

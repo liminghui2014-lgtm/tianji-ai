@@ -1,5 +1,6 @@
 streamlit
 anthropic
+supabase
 rank-bm25
 sentence-transformers
 jieba

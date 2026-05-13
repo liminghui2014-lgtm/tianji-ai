@@ -674,9 +674,7 @@ if st.session_state.page == "landing":
     
     if st.session_state.page == "landing":
         st.markdown("---")
-else:
-    pass  # skip landing content on form/result pages
-    st.stop()
+        st.stop()
 
 # 手机号登录
 phone_col, _ = st.columns([1, 2])

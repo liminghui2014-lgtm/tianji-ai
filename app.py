@@ -14,9 +14,13 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from anthropic import Anthropic
 from geju_detect import detect_geju
-from storage import (save_user, save_chart_and_reading, save_chat, load_chat_history,
-    get_stats, consume_free_chat, get_remaining_free_chats, save_feedback,
-    get_feedback_stats, get_or_create_user, check_daily_quota, consume_daily_chat)
+from storage import save_user, save_chart_and_reading, save_chat, load_chat_history, get_stats, consume_free_chat, get_remaining_free_chats, save_feedback, get_feedback_stats
+try:
+    from storage import get_or_create_user, check_daily_quota, consume_daily_chat
+except ImportError:
+    get_or_create_user = lambda p: None
+    check_daily_quota = lambda u: (10, False)
+    consume_daily_chat = lambda u: None
 
 BASE_DIR = Path(__file__).parent
 CALCULATOR = BASE_DIR / "chart_calculator.js"

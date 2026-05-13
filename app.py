@@ -580,7 +580,25 @@ for key in ["chart_data","reading","geju_list","name","chat_history",
             "user_id","chart_id","share_id","phone","logged_in","page"]:
     if key not in st.session_state:
         st.session_state[key] = None if key != "chat_history" else []
-if st.session_state.page is None: st.session_state.page = "landing"
+if st.session_state.page is None:
+    st.session_state.page = "landing"
+# ↓ 测试用：直接灌数据
+if "test_data" not in st.session_state:
+    st.session_state.test_data = True
+    st.session_state.chart_data = {"五行局":"水二局","基本信息":{"性别":"男","阳历":"2000-01-01","农历":"腊月廿五","四柱":"己卯 丁丑 戊子 甲寅","生肖":"兔"},"命盘":[{"宫位":"命宫","天干":"甲","地支":"子","主星":"紫微","辅星":"天相","身宫":True,"四化":"化科"}]}
+    st.session_state.reading = "## 核心结论\n你最现实的AI切入方向是：紫微坐命，天生的领导者和决策者。\n\n## 测试解读\n这是一段测试解读文本，验证结果页渲染。"
+    st.session_state.geju_list = [("紫府同宫","富贵","紫微天府同度，主富贵双全")]
+    st.session_state.name = "测试用户"
+    st.session_state.user_id = None
+    st.session_state.chart_id = 1
+    st.session_state.chat_history = []
+    st.session_state.true_h = 8
+    st.session_state.true_m = 30
+    st.session_state.zhi_idx = 4
+    st.session_state.hour = 9
+    st.session_state.minute = 0
+    st.session_state.city = "北京"
+    st.session_state.lon = 116.4
 if "chat_bonus" not in st.session_state: st.session_state.chat_bonus = 0
 if "feedback_done" not in st.session_state: st.session_state.feedback_done = False
 

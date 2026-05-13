@@ -799,6 +799,7 @@ if st.session_state.page == "form":
     st.stop()
 
 if st.session_state.chart_data is not None:
+    st.success("解读完成！")
     chart_data = st.session_state.chart_data
     reading = st.session_state.reading
     geju_list = st.session_state.geju_list

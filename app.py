@@ -793,7 +793,7 @@ if submitted and name:
         st.session_state.page = "result"
         st.rerun()
     except Exception as e:
-        st.error("出错了: " + str(e))
+        st.exception(e)
 
 if st.session_state.page == "form":
     st.stop()
@@ -966,7 +966,7 @@ if st.session_state.chart_data is not None:
     </div>
     """, unsafe_allow_html=True)
 
-    rating = st.radio("", [
+    rating = st.radio("印证程度", [
         "🥠 铁口直断，完全命中",
         "🤔 有些参考价值，但不全对",
         "❌ 驴头不对马嘴"

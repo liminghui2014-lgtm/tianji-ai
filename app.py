@@ -352,41 +352,6 @@ def generate_reading(chart_data, name, geju_list):
     return str(response.content[0])
 
 
-def generate_opening_chat(chart_data, name, geju_list):
-    """排盘后 AI 主动开场：性格底色 + 痛点悬念 + 引导提问"""
-    client = Anthropic(api_key=API_KEY, base_url=API_BASE)
-    rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=2000)
-    basic, geju_text, palace_text = build_chart_summary(chart_data, geju_list)
-    today = datetime.now().strftime("%Y年%m月%d日")
-
-    prompt = f"""当前日期：{today}。你是倪海夏。你刚看完 {name} 的紫微斗数命盘。现在你要用微信语音消息的口吻，主动对ta说出你的第一印象。
-
-规则：
-- 100字以内，口语化，像长辈第一次看你的盘
-- 说1个核心性格底色（引用命宫主星和落宫）
-- 抛1个悬念反问（让ta想继续聊下去，比如"是不是今年有...的感觉"）
-- 给3个快捷回复建议（让ta不用自己想问题）
-- 用 {name} 称呼对方
-
-命盘概要：
-{basic.get('性别','')} | {basic.get('阳历','')} | {basic.get('四柱','')}
-格局: {geju_text[:300]}
-命宫: {next((p for p in chart_data.get('命盘',[]) if p['宫位']=='命宫'), {})}
-
-输出格式（严格三行）：
-[开场白]
-[反问]
-[快捷回复1] | [快捷回复2] | [快捷回复3]"""
-
-    response = client.messages.create(
-        model=API_MODEL_FAST, max_tokens=300, temperature=0.6,
-        thinking={"type": "disabled"},
-        messages=[{"role": "user", "content": prompt}],
-    )
-    text_blocks = [b.text for b in response.content if hasattr(b, 'text') and b.text]
-    return "\n".join(text_blocks) if text_blocks else f"{name}，我看完你的盘了。命宫坐{'命宫' if geju_list else '紫微'}，性格底色很鲜明。这些年是不是总觉得有些东西能成但又差那么一点？想听听倪师怎么看你的盘吗？\n聊聊事业 | 聊聊感情 | 聊聊财运"
-
-
 def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)
 
@@ -577,28 +542,9 @@ st.markdown("""
 
 for key in ["chart_data","reading","geju_list","name","chat_history",
             "true_h","true_m","zhi_idx","hour","minute","city","lon",
-            "user_id","chart_id","share_id","phone","logged_in","page"]:
+            "user_id","chart_id","share_id","phone","logged_in"]:
     if key not in st.session_state:
         st.session_state[key] = None if key != "chat_history" else []
-if st.session_state.page is None:
-    st.session_state.page = "landing"
-# ↓ 测试用：直接灌数据
-if "test_data" not in st.session_state:
-    st.session_state.test_data = True
-    st.session_state.chart_data = {"五行局":"水二局","基本信息":{"性别":"男","阳历":"2000-01-01","农历":"腊月廿五","四柱":"己卯 丁丑 戊子 甲寅","生肖":"兔"},"命盘":[{"宫位":"命宫","天干":"甲","地支":"子","主星":"紫微","辅星":"天相","身宫":True,"四化":"化科"}]}
-    st.session_state.reading = "## 核心结论\n你最现实的AI切入方向是：紫微坐命，天生的领导者和决策者。\n\n## 测试解读\n这是一段测试解读文本，验证结果页渲染。"
-    st.session_state.geju_list = [("紫府同宫","富贵","紫微天府同度，主富贵双全")]
-    st.session_state.name = "测试用户"
-    st.session_state.user_id = None
-    st.session_state.chart_id = 1
-    st.session_state.chat_history = []
-    st.session_state.true_h = 8
-    st.session_state.true_m = 30
-    st.session_state.zhi_idx = 4
-    st.session_state.hour = 9
-    st.session_state.minute = 0
-    st.session_state.city = "北京"
-    st.session_state.lon = 116.4
 if "chat_bonus" not in st.session_state: st.session_state.chat_bonus = 0
 if "feedback_done" not in st.session_state: st.session_state.feedback_done = False
 
@@ -630,104 +576,99 @@ if cid and st.session_state.chart_data is None:
     except Exception:
         pass
 
-if st.session_state.page == "landing":
-    # ── Landing Page ──
-    st.markdown("""
-    <div style="text-align:center;padding:40px 0 20px;">
-      <h1 style="font-size:1.6rem;margin-bottom:8px;letter-spacing:0.04em;">与先哲对话 —— 天纪 AI</h1>
-      <p style="color:#b0a090;font-size:0.9rem;line-height:1.6;max-width:480px;margin:0 auto;">
-      这不是一次算命，这是一场基于倪海夏体系与紫微斗数哲学的深度自我勘探。
-      </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    _, cta_col, _ = st.columns([1, 1.2, 1])
-    with cta_col:
-        if st.button("开启勘探", key="lp_cta", use_container_width=True):
-            st.session_state.page = "form"
-            st.rerun()
-    
-    st.markdown("---")
-    
-    # 品牌愿景
-    st.markdown("""
-    <div style="
-      background: rgba(196,168,112,0.06);
-      border: 1px solid rgba(196,168,112,0.12);
-      border-radius: 8px;
-      padding: 14px 18px;
-      margin: 0 0 16px 0;
-      font-size: 0.82rem;
-      line-height: 1.6;
-      text-align:center;
-    ">
-    我致力于将人类历史上伟大的思想通过 AI 具象化。<br>
-    紫微斗数不仅是命理，更是中国古代关于时空、性格与命运的统计学与哲学模型。
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # 关于天纪
-    st.markdown("""
-    <div style="
-      background: rgba(196,168,112,0.08);
-      border: 1px solid rgba(196,168,112,0.2);
-      border-radius: 10px;
-      padding: 16px 18px;
-      margin: 0 0 16px 0;
-      font-size: 0.85rem;
-      line-height: 1.6;
-    ">
-    <strong style="color:#c4a870;">什么是天纪</strong><br><br>
-    天纪是倪海夏先生讲授的紫微斗数课程，但它的内容远不止算命。<br><br>
-    倪师认为，一个人的命运由三部分组成：<br>
-    <strong>三分看盘</strong> —— 紫微斗数命盘是「出厂设置」，显示你的天赋、性格、运势走向<br>
-    <strong>三分风水</strong> —— 居住环境、方位格局对人生的影响，阳宅阴宅皆在其中<br>
-    <strong>三分易理处事</strong> —— 易经的智慧落到日常：什么时候进、什么时候退、怎么和人相处、怎么面对逆境<br><br>
-    所以天纪不只是告诉你「命好不好」——它会教你怎么认识自己，怎么与环境相处，怎么在关键时刻做出对的判断。命盘是起点，不是终点。
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # RAG 差异化
-    st.markdown("""
-    <div style="
-      background: rgba(196,168,112,0.06);
-      border: 1px solid rgba(196,168,112,0.15);
-      border-radius: 10px;
-      padding: 14px 18px;
-      margin: 0 0 16px 0;
-      font-size: 0.82rem;
-      line-height: 1.5;
-    ">
-    <strong style="color:#c4a870;">为什么天纪 AI 与普通 AI 不同</strong><br>
-    普通 AI 像一个背过维基百科的学生——紫微斗数的术语它都见过，但容易张冠李戴。天纪 AI 基于 87 万字倪师《天纪》原话语料构建 RAG 知识库，每一次回答都先检索倪师真实说过的内容，再以倪师的思维框架生成解读。你听到的不是 AI 的想象，是倪师本人的原话、分寸和智慧。
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # 引导提问方向
-    st.markdown("""
-    <div style="
-      background: rgba(196,168,112,0.04);
-      border: 1px solid rgba(196,168,112,0.1);
-      border-radius: 10px;
-      padding: 14px 18px;
-      margin: 0 0 12px 0;
-      font-size: 0.85rem;
-      line-height: 1.6;
-    ">
-    <strong style="color:#c4a870;">你可以从这些角度了解自己</strong><br><br>
-    不只是「我什么时候发财」——天纪能聊的远比算命多：<br><br>
-    <strong>命理</strong> —— 我的命盘格局是什么？杀破狼还是机月同梁？适合创业还是守成？<br>
-    <strong>风水</strong> —— 家里哪个方位影响我的运势？办公室怎么布置对自己有利？<br>
-    <strong>中医健康</strong> —— 命盘里哪些星曜提示了健康隐患？五行失衡怎么调？<br>
-    <strong>易经处事</strong> —— 当下这个困局，易经里哪一卦给我启发？是该进还是该等？<br>
-    <strong>人生选择</strong> —— 这段感情要不要继续？这个城市适合我发展吗？<br><br>
-    不要只问「我命好不好」——命盘是一个地图，怎么走是你的事。天纪的责任是帮你把地图读懂。
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if st.session_state.page == "landing":
-        st.markdown("---")
-        st.stop()
+# ── Landing Page ──
+st.markdown("""
+<div style="text-align:center;padding:40px 0 20px;">
+  <h1 style="font-size:1.6rem;margin-bottom:8px;letter-spacing:0.04em;">与先哲对话 —— 天纪 AI</h1>
+  <p style="color:#b0a090;font-size:0.9rem;line-height:1.6;max-width:480px;margin:0 auto;">
+  这不是一次算命，这是一场基于倪海夏体系与紫微斗数哲学的深度自我勘探。
+  </p>
+</div>
+""", unsafe_allow_html=True)
+
+_, cta_col, _ = st.columns([1, 1.2, 1])
+with cta_col:
+    st.button("开启勘探", key="lp_cta", use_container_width=True)
+
+st.markdown("---")
+
+# 品牌愿景
+st.markdown("""
+<div style="
+  background: rgba(196,168,112,0.06);
+  border: 1px solid rgba(196,168,112,0.12);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 0 0 16px 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  text-align:center;
+">
+我致力于将人类历史上伟大的思想通过 AI 具象化。<br>
+紫微斗数不仅是命理，更是中国古代关于时空、性格与命运的统计学与哲学模型。
+</div>
+""", unsafe_allow_html=True)
+
+# 关于天纪
+st.markdown("""
+<div style="
+  background: rgba(196,168,112,0.08);
+  border: 1px solid rgba(196,168,112,0.2);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin: 0 0 16px 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+">
+<strong style="color:#c4a870;">什么是天纪</strong><br><br>
+天纪是倪海夏先生讲授的紫微斗数课程，但它的内容远不止算命。<br><br>
+倪师认为，一个人的命运由三部分组成：<br>
+<strong>三分看盘</strong> —— 紫微斗数命盘是「出厂设置」，显示你的天赋、性格、运势走向<br>
+<strong>三分风水</strong> —— 居住环境、方位格局对人生的影响，阳宅阴宅皆在其中<br>
+<strong>三分易理处事</strong> —— 易经的智慧落到日常：什么时候进、什么时候退、怎么和人相处、怎么面对逆境<br><br>
+所以天纪不只是告诉你「命好不好」——它会教你怎么认识自己，怎么与环境相处，怎么在关键时刻做出对的判断。命盘是起点，不是终点。
+</div>
+""", unsafe_allow_html=True)
+
+# RAG 差异化
+st.markdown("""
+<div style="
+  background: rgba(196,168,112,0.06);
+  border: 1px solid rgba(196,168,112,0.15);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 0 0 16px 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+">
+<strong style="color:#c4a870;">为什么天纪 AI 与普通 AI 不同</strong><br>
+普通 AI 像一个背过维基百科的学生——紫微斗数的术语它都见过，但容易张冠李戴。天纪 AI 基于 87 万字倪师《天纪》原话语料构建 RAG 知识库，每一次回答都先检索倪师真实说过的内容，再以倪师的思维框架生成解读。你听到的不是 AI 的想象，是倪师本人的原话、分寸和智慧。
+</div>
+""", unsafe_allow_html=True)
+
+# 引导提问方向
+st.markdown("""
+<div style="
+  background: rgba(196,168,112,0.04);
+  border: 1px solid rgba(196,168,112,0.1);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 0 0 12px 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+">
+<strong style="color:#c4a870;">你可以从这些角度了解自己</strong><br><br>
+不只是「我什么时候发财」——天纪能聊的远比算命多：<br><br>
+<strong>命理</strong> —— 我的命盘格局是什么？杀破狼还是机月同梁？适合创业还是守成？<br>
+<strong>风水</strong> —— 家里哪个方位影响我的运势？办公室怎么布置对自己有利？<br>
+<strong>中医健康</strong> —— 命盘里哪些星曜提示了健康隐患？五行失衡怎么调？<br>
+<strong>易经处事</strong> —— 当下这个困局，易经里哪一卦给我启发？是该进还是该等？<br>
+<strong>人生选择</strong> —— 这段感情要不要继续？这个城市适合我发展吗？<br><br>
+不要只问「我命好不好」——命盘是一个地图，怎么走是你的事。天纪的责任是帮你把地图读懂。
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("---")
 
 # 手机号登录
 phone_col, _ = st.columns([1, 2])
@@ -793,14 +734,6 @@ if submitted and name:
         st.session_state.user_id = user_id
         st.session_state.chart_id = chart_id
         st.session_state.chat_history = load_chat_history(user_id, chart_id)
-        # 新命盘：AI 先说话
-        if len(st.session_state.chat_history) == 0:
-            opening = generate_opening_chat(chart_data, name, geju_list)
-            st.session_state.chat_history = [("倪师开场", opening)]
-            save_chat(user_id, chart_id, "倪师开场", opening)
-            st.session_state.has_opening = True
-        else:
-            st.session_state.has_opening = True
         st.session_state.true_h = true_h
         st.session_state.true_m = true_m
         st.session_state.zhi_idx = zhi_idx
@@ -808,16 +741,11 @@ if submitted and name:
         st.session_state.minute = minute
         st.session_state.city = city
         st.session_state.lon = lon
-        st.session_state.page = "result"
         st.rerun()
     except Exception as e:
-        st.exception(e)
-
-if st.session_state.page == "form":
-    st.stop()
+        st.error("出错了: " + str(e))
 
 if st.session_state.chart_data is not None:
-    st.success("解读完成！")
     chart_data = st.session_state.chart_data
     reading = st.session_state.reading
     geju_list = st.session_state.geju_list
@@ -830,16 +758,8 @@ if st.session_state.chart_data is not None:
     city = st.session_state.city
     lon = st.session_state.lon
 
-    st.markdown(f'<div style="text-align:center;padding:8px 0;"><span style="color:#c4a870;font-size:0.9rem;">{name}</span><span style="color:#8b7e6a;font-size:0.75rem;"> · 命盘解读</span></div>', unsafe_allow_html=True)
-
-    # ── 40/60 分屏：上半区 Tab（星盘+详批）──
-    top_container = st.container()
-    with top_container:
-        tab_a, tab_b = st.tabs(["星盘推演", "天纪详批"])
-        with tab_a:
-            render_star_chart(chart_data)
-        with tab_b:
-            st.markdown(reading)
+    st.markdown("---")
+    st.markdown(f'<div style="text-align:center;padding:12px 0;"><span style="color:#c4a870;font-size:0.9rem;">{name}</span><span style="color:#8b7e6a;font-size:0.75rem;"> · 命盘解读</span></div>', unsafe_allow_html=True)
 
     time_display = get_time_display(zhi_idx)
     mt_cols = st.columns(5)
@@ -977,44 +897,37 @@ if st.session_state.chart_data is not None:
 
     st.markdown("---")
 
-    # ── 倪师的课后校验（V2 反馈）──
-    st.markdown("---")
-    st.markdown("""
-    <div style="background:rgba(196,168,112,0.08);border:1px solid rgba(196,168,112,0.2);border-radius:10px;padding:16px 18px;text-align:center;">
-    <p style="color:#c4a870;font-size:0.9rem;margin:0;">盘我看过了，刚才聊的这些，跟你目前的真实处境印证得如何？</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    rating = st.radio("印证程度", [
-        "🥠 铁口直断，完全命中",
-        "🤔 有些参考价值，但不全对",
-        "❌ 驴头不对马嘴"
-    ], index=None, key="fb_rating", horizontal=False)
-
-    if rating:
-        score = 5 if "铁口" in rating else (3 if "参考" in rating else 1)
-        tags = st.multiselect("哪些地方让你有这种感觉？（可多选）",
-            ["测算准","态度好","像真人","有代入感","逻辑清楚","有幻觉","重复废话","太笼统","口吻不对","其他"],
-            key="fb_tags")
-        text = st.text_area("如果觉得有偏差，是哪里不准？你说出来，我调整推演逻辑。",
-            placeholder="比如：感情宫说得不对，我其实是...", key="fb_text")
-
-        if st.button("提交反馈，再获 3 次对话", key="fb_submit", use_container_width=True):
+    # ── 反馈（填完后送3次对话）──
+    st.markdown("### 这个解读对你有用吗？")
+    fc1, fc2, fc3 = st.columns(3)
+    with fc1:
+        if st.button("有用", key="tianji_useful", use_container_width=True):
             if st.session_state.user_id and st.session_state.chart_id:
-                try:
-                    from storage import save_feedback_v2, claim_feedback_reward
-                    ok = save_feedback_v2(st.session_state.user_id, st.session_state.chart_id,
-                                          score, tags, text)
-                    if ok:
-                        if claim_feedback_reward(st.session_state.user_id, st.session_state.chart_id):
-                            st.session_state.chat_bonus += 3
-                        st.success("收到你的反馈了。我已调整推演逻辑，再送你 3 次对话。")
-                    else:
-                        st.info("你已经提交过反馈了，谢谢你的认真。")
-                except Exception:
-                    st.warning("反馈记录失败，但对话额度已赠送")
+                save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=1)
+            if not st.session_state.feedback_done:
+                st.session_state.chat_bonus = 3
+                st.session_state.feedback_done = True
+            st.success("感谢反馈！已获得 3 次额外免费对话")
+    with fc2:
+        if st.button("不太准", key="tianji_not_useful", use_container_width=True):
+            if st.session_state.user_id and st.session_state.chart_id:
+                save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=0)
+            if not st.session_state.feedback_done:
+                st.session_state.chat_bonus = 3
+                st.session_state.feedback_done = True
+            st.success("感谢反馈！已获得 3 次额外免费对话")
 
-    st.markdown('<p style="margin-top:16px;font-size:0.85rem;text-align:center;">想支持天纪持续进化？了解无限对话会员</p>', unsafe_allow_html=True)
+    st.markdown('<p style="margin-top:16px;font-size:0.85rem;">如果可以无限量与倪师对话 + 解锁大限流年 + 合盘解读，你愿意付多少钱？</p>', unsafe_allow_html=True)
+    pcols = st.columns(4)
+    for i, price in enumerate(["19.9", "49.9", "99", "不愿意"]):
+        with pcols[i]:
+            if st.button(price, key=f"tianji_wtp_{i}", use_container_width=True):
+                if st.session_state.user_id and st.session_state.chart_id:
+                    save_feedback(st.session_state.user_id, st.session_state.chart_id, wtp=price)
+                if not st.session_state.feedback_done:
+                    st.session_state.chat_bonus = 3
+                    st.session_state.feedback_done = True
+                st.success("已记录，已获得 3 次额外免费对话")
 
     with st.expander("查看命盘数据"):
         st.json(chart_data)

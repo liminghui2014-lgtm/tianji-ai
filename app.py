@@ -577,102 +577,105 @@ if cid and st.session_state.chart_data is None:
     except Exception:
         pass
 
-# ── Landing Page ──
-st.markdown("""
-<div style="text-align:center;padding:40px 0 20px;">
-  <h1 style="font-size:1.6rem;margin-bottom:8px;letter-spacing:0.04em;">与先哲对话 —— 天纪 AI</h1>
-  <p style="color:#b0a090;font-size:0.9rem;line-height:1.6;max-width:480px;margin:0 auto;">
-  这不是一次算命，这是一场基于倪海夏体系与紫微斗数哲学的深度自我勘探。
-  </p>
-</div>
-""", unsafe_allow_html=True)
-
-_, cta_col, _ = st.columns([1, 1.2, 1])
-with cta_col:
-    if st.button("开启勘探", key="lp_cta", use_container_width=True):
-        st.session_state.page = "form"
-        st.rerun()
-
-st.markdown("---")
-
-# 品牌愿景
-st.markdown("""
-<div style="
-  background: rgba(196,168,112,0.06);
-  border: 1px solid rgba(196,168,112,0.12);
-  border-radius: 8px;
-  padding: 14px 18px;
-  margin: 0 0 16px 0;
-  font-size: 0.82rem;
-  line-height: 1.6;
-  text-align:center;
-">
-我致力于将人类历史上伟大的思想通过 AI 具象化。<br>
-紫微斗数不仅是命理，更是中国古代关于时空、性格与命运的统计学与哲学模型。
-</div>
-""", unsafe_allow_html=True)
-
-# 关于天纪
-st.markdown("""
-<div style="
-  background: rgba(196,168,112,0.08);
-  border: 1px solid rgba(196,168,112,0.2);
-  border-radius: 10px;
-  padding: 16px 18px;
-  margin: 0 0 16px 0;
-  font-size: 0.85rem;
-  line-height: 1.6;
-">
-<strong style="color:#c4a870;">什么是天纪</strong><br><br>
-天纪是倪海夏先生讲授的紫微斗数课程，但它的内容远不止算命。<br><br>
-倪师认为，一个人的命运由三部分组成：<br>
-<strong>三分看盘</strong> —— 紫微斗数命盘是「出厂设置」，显示你的天赋、性格、运势走向<br>
-<strong>三分风水</strong> —— 居住环境、方位格局对人生的影响，阳宅阴宅皆在其中<br>
-<strong>三分易理处事</strong> —— 易经的智慧落到日常：什么时候进、什么时候退、怎么和人相处、怎么面对逆境<br><br>
-所以天纪不只是告诉你「命好不好」——它会教你怎么认识自己，怎么与环境相处，怎么在关键时刻做出对的判断。命盘是起点，不是终点。
-</div>
-""", unsafe_allow_html=True)
-
-# RAG 差异化
-st.markdown("""
-<div style="
-  background: rgba(196,168,112,0.06);
-  border: 1px solid rgba(196,168,112,0.15);
-  border-radius: 10px;
-  padding: 14px 18px;
-  margin: 0 0 16px 0;
-  font-size: 0.82rem;
-  line-height: 1.5;
-">
-<strong style="color:#c4a870;">为什么天纪 AI 与普通 AI 不同</strong><br>
-普通 AI 像一个背过维基百科的学生——紫微斗数的术语它都见过，但容易张冠李戴。天纪 AI 基于 87 万字倪师《天纪》原话语料构建 RAG 知识库，每一次回答都先检索倪师真实说过的内容，再以倪师的思维框架生成解读。你听到的不是 AI 的想象，是倪师本人的原话、分寸和智慧。
-</div>
-""", unsafe_allow_html=True)
-
-# 引导提问方向
-st.markdown("""
-<div style="
-  background: rgba(196,168,112,0.04);
-  border: 1px solid rgba(196,168,112,0.1);
-  border-radius: 10px;
-  padding: 14px 18px;
-  margin: 0 0 12px 0;
-  font-size: 0.85rem;
-  line-height: 1.6;
-">
-<strong style="color:#c4a870;">你可以从这些角度了解自己</strong><br><br>
-不只是「我什么时候发财」——天纪能聊的远比算命多：<br><br>
-<strong>命理</strong> —— 我的命盘格局是什么？杀破狼还是机月同梁？适合创业还是守成？<br>
-<strong>风水</strong> —— 家里哪个方位影响我的运势？办公室怎么布置对自己有利？<br>
-<strong>中医健康</strong> —— 命盘里哪些星曜提示了健康隐患？五行失衡怎么调？<br>
-<strong>易经处事</strong> —— 当下这个困局，易经里哪一卦给我启发？是该进还是该等？<br>
-<strong>人生选择</strong> —— 这段感情要不要继续？这个城市适合我发展吗？<br><br>
-不要只问「我命好不好」——命盘是一个地图，怎么走是你的事。天纪的责任是帮你把地图读懂。
-</div>
-""", unsafe_allow_html=True)
-
 if st.session_state.page == "landing":
+    # ── Landing Page ──
+    st.markdown("""
+    <div style="text-align:center;padding:40px 0 20px;">
+      <h1 style="font-size:1.6rem;margin-bottom:8px;letter-spacing:0.04em;">与先哲对话 —— 天纪 AI</h1>
+      <p style="color:#b0a090;font-size:0.9rem;line-height:1.6;max-width:480px;margin:0 auto;">
+      这不是一次算命，这是一场基于倪海夏体系与紫微斗数哲学的深度自我勘探。
+      </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    _, cta_col, _ = st.columns([1, 1.2, 1])
+    with cta_col:
+        if st.button("开启勘探", key="lp_cta", use_container_width=True):
+            st.session_state.page = "form"
+            st.rerun()
+    
     st.markdown("---")
+    
+    # 品牌愿景
+    st.markdown("""
+    <div style="
+      background: rgba(196,168,112,0.06);
+      border: 1px solid rgba(196,168,112,0.12);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 0 0 16px 0;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      text-align:center;
+    ">
+    我致力于将人类历史上伟大的思想通过 AI 具象化。<br>
+    紫微斗数不仅是命理，更是中国古代关于时空、性格与命运的统计学与哲学模型。
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 关于天纪
+    st.markdown("""
+    <div style="
+      background: rgba(196,168,112,0.08);
+      border: 1px solid rgba(196,168,112,0.2);
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin: 0 0 16px 0;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    ">
+    <strong style="color:#c4a870;">什么是天纪</strong><br><br>
+    天纪是倪海夏先生讲授的紫微斗数课程，但它的内容远不止算命。<br><br>
+    倪师认为，一个人的命运由三部分组成：<br>
+    <strong>三分看盘</strong> —— 紫微斗数命盘是「出厂设置」，显示你的天赋、性格、运势走向<br>
+    <strong>三分风水</strong> —— 居住环境、方位格局对人生的影响，阳宅阴宅皆在其中<br>
+    <strong>三分易理处事</strong> —— 易经的智慧落到日常：什么时候进、什么时候退、怎么和人相处、怎么面对逆境<br><br>
+    所以天纪不只是告诉你「命好不好」——它会教你怎么认识自己，怎么与环境相处，怎么在关键时刻做出对的判断。命盘是起点，不是终点。
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # RAG 差异化
+    st.markdown("""
+    <div style="
+      background: rgba(196,168,112,0.06);
+      border: 1px solid rgba(196,168,112,0.15);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin: 0 0 16px 0;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    ">
+    <strong style="color:#c4a870;">为什么天纪 AI 与普通 AI 不同</strong><br>
+    普通 AI 像一个背过维基百科的学生——紫微斗数的术语它都见过，但容易张冠李戴。天纪 AI 基于 87 万字倪师《天纪》原话语料构建 RAG 知识库，每一次回答都先检索倪师真实说过的内容，再以倪师的思维框架生成解读。你听到的不是 AI 的想象，是倪师本人的原话、分寸和智慧。
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 引导提问方向
+    st.markdown("""
+    <div style="
+      background: rgba(196,168,112,0.04);
+      border: 1px solid rgba(196,168,112,0.1);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin: 0 0 12px 0;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    ">
+    <strong style="color:#c4a870;">你可以从这些角度了解自己</strong><br><br>
+    不只是「我什么时候发财」——天纪能聊的远比算命多：<br><br>
+    <strong>命理</strong> —— 我的命盘格局是什么？杀破狼还是机月同梁？适合创业还是守成？<br>
+    <strong>风水</strong> —— 家里哪个方位影响我的运势？办公室怎么布置对自己有利？<br>
+    <strong>中医健康</strong> —— 命盘里哪些星曜提示了健康隐患？五行失衡怎么调？<br>
+    <strong>易经处事</strong> —— 当下这个困局，易经里哪一卦给我启发？是该进还是该等？<br>
+    <strong>人生选择</strong> —— 这段感情要不要继续？这个城市适合我发展吗？<br><br>
+    不要只问「我命好不好」——命盘是一个地图，怎么走是你的事。天纪的责任是帮你把地图读懂。
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.session_state.page == "landing":
+        st.markdown("---")
+else:
+    pass  # skip landing content on form/result pages
     st.stop()
 
 # 手机号登录

@@ -576,10 +576,36 @@ if cid and st.session_state.chart_data is None:
     except Exception:
         pass
 
+# ── Landing Page ──
 st.markdown("""
-<div style="text-align:center;padding:20px 0 10px;">
-  <h1 style="font-size:1.3rem;margin-bottom:4px;">天纪</h1>
-  <p style="color:#8b7e6a;font-size:0.75rem;letter-spacing:0.06em;">倪海夏 · 天纪体系 · AI 解读与对话</p>
+<div style="text-align:center;padding:40px 0 20px;">
+  <h1 style="font-size:1.6rem;margin-bottom:8px;letter-spacing:0.04em;">与先哲对话 —— 天纪 AI</h1>
+  <p style="color:#b0a090;font-size:0.9rem;line-height:1.6;max-width:480px;margin:0 auto;">
+  这不是一次算命，这是一场基于倪海夏体系与紫微斗数哲学的深度自我勘探。
+  </p>
+</div>
+""", unsafe_allow_html=True)
+
+_, cta_col, _ = st.columns([1, 1.2, 1])
+with cta_col:
+    st.button("开启勘探", key="lp_cta", use_container_width=True)
+
+st.markdown("---")
+
+# 品牌愿景
+st.markdown("""
+<div style="
+  background: rgba(196,168,112,0.06);
+  border: 1px solid rgba(196,168,112,0.12);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 0 0 16px 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  text-align:center;
+">
+我致力于将人类历史上伟大的思想通过 AI 具象化。<br>
+紫微斗数不仅是命理，更是中国古代关于时空、性格与命运的统计学与哲学模型。
 </div>
 """, unsafe_allow_html=True)
 
@@ -643,6 +669,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("---")
+
+# 手机号登录
+phone_col, _ = st.columns([1, 2])
+with phone_col:
+    phone_input = st.text_input("手机号（登录后可保存记录，选填）", placeholder="输入手机号，记录你的命盘历史", key="phone_input")
+    if phone_input and len(phone_input) == 11 and phone_input.isdigit():
+        try:
+            uid = get_or_create_user(phone_input)
+            st.session_state.user_id = uid
+            st.session_state.phone = phone_input
+            st.success("已识别")
+        except Exception:
+            pass
 
 with st.form("input_form"):
     col1, col2 = st.columns(2)

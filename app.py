@@ -14,7 +14,9 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from anthropic import Anthropic
 from geju_detect import detect_geju
-from storage import save_user, save_chart_and_reading, save_chat, load_chat_history, get_stats, consume_free_chat, get_remaining_free_chats, save_feedback, get_feedback_stats
+from storage import (save_user, save_chart_and_reading, save_chat, load_chat_history,
+    get_stats, consume_free_chat, get_remaining_free_chats, save_feedback,
+    get_feedback_stats, get_or_create_user, check_daily_quota, consume_daily_chat)
 
 BASE_DIR = Path(__file__).parent
 CALCULATOR = BASE_DIR / "chart_calculator.js"
@@ -388,6 +390,12 @@ def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
     today = datetime.now().strftime("%Y年%m月%d日")
     system_prompt = """当前日期：""" + today + """。你是天纪派紫微斗数解读师，师承倪海夏先生。{name}正在和你面对面讨论ta的命盘。
 
+护栏铁律：
+- 每次回复限200字以内
+- 结尾必须抛出一个基于具体星曜/宫位的反问（用？结尾），交出话语权
+- 拒答"算命/改运/驱邪/做法"，回应"这是紫微斗数传统文化探讨范畴"
+- 不承诺任何超自然效果，不惊吓、不恐吓
+
 {context}
 
 ## 你的回答准则
@@ -530,9 +538,11 @@ st.markdown("""
 
 for key in ["chart_data","reading","geju_list","name","chat_history",
             "true_h","true_m","zhi_idx","hour","minute","city","lon",
-            "user_id","chart_id","share_id"]:
+            "user_id","chart_id","share_id","phone","logged_in"]:
     if key not in st.session_state:
         st.session_state[key] = None if key != "chat_history" else []
+if "chat_bonus" not in st.session_state: st.session_state.chat_bonus = 0
+if "feedback_done" not in st.session_state: st.session_state.feedback_done = False
 
 # ── 分享链接路由：?chart_id=xxx 直接加载已有命盘 ──
 qp = st.query_params
@@ -760,22 +770,23 @@ if st.session_state.chart_data is not None:
     </div>
     """, unsafe_allow_html=True)
 
-    # 免费次数逻辑：基础2次 + 反馈后+3次
-    if "chat_bonus" not in st.session_state:
-        st.session_state.chat_bonus = 0
-    if "feedback_done" not in st.session_state:
-        st.session_state.feedback_done = False
-
-    base_free = 2
-    total_free = base_free + st.session_state.chat_bonus
-    used = len([1 for q, a in st.session_state.chat_history if q != "__system__"])
-    remaining = total_free - used
+    # 配额：10次/日，会员无限
+    if st.session_state.user_id:
+        try:
+            remaining, is_vip = check_daily_quota(st.session_state.user_id)
+        except Exception:
+            remaining, is_vip = 10, False
+    else:
+        remaining, is_vip = 10, False
 
     chat_tab1, chat_tab2 = st.tabs(["与倪师对话", "对话记录"])
 
     with chat_tab1:
-        if remaining > 0:
-            st.caption("免费对话剩余 {} 次（反馈后可再得 3 次）".format(remaining))
+        if remaining > 0 or is_vip:
+            if is_vip:
+                st.caption("会员无限对话")
+            else:
+                st.caption("今日剩余 {} 次免费对话".format(remaining))
 
             # 快捷问题——直接发送，不用表单
             st.markdown('<p style="font-size:0.8rem;color:#e8e0d4;margin:8px 0 4px;">点击直接发送：</p>', unsafe_allow_html=True)
@@ -806,21 +817,24 @@ if st.session_state.chart_data is not None:
             # 处理发送
             final_q = quick_sent or (user_q if submitted else None)
             if final_q:
-                if remaining <= 0:
-                    st.error("免费次数已用完。反馈后可再得 3 次。")
+                if not is_vip and remaining <= 0:
+                    st.error("今日免费对话已用完。明天重置，或开通会员无限畅聊。")
                 else:
                     with st.spinner("倪师思考中..."):
                         history_str = "\n".join(["问: {}\n答: {}".format(q,a) for q,a in st.session_state.chat_history[-3:]])
                         chat_reply = generate_chat(chart_data, name, geju_list, final_q, history_str)
                     st.session_state.chat_history.append((final_q, chat_reply))
                     save_chat(st.session_state.user_id, st.session_state.chart_id, final_q, chat_reply)
+                    if st.session_state.user_id and not is_vip:
+                        try: consume_daily_chat(st.session_state.user_id)
+                        except: pass
                     st.rerun()
 
         else:
-            if not st.session_state.feedback_done:
-                st.info("免费对话已用完。在下方填写反馈后可再获得 3 次免费对话。")
+            if is_vip:
+                pass  # 会员永远不触发此分支
             else:
-                st.info("免费对话已用完。升级付费版即可无限对话，含大限流年解读、合盘、流月运势。")
+                st.info("今日免费对话已用完。明天重置 10 次，或开通会员无限畅聊。¥19.9/月")
 
     with chat_tab2:
         if st.session_state.chat_history:
@@ -874,3 +888,7 @@ if st.session_state.chart_data is not None:
 
     with st.expander("查看命盘数据"):
         st.json(chart_data)
+
+# ── 全局合规免责 ──
+st.markdown("---")
+st.markdown('<p style="color:#5a5040;font-size:0.6rem;text-align:center;line-height:1.5;">服务定位：本系统提供基于倪海夏天纪体系的传统文化对话，并非算命服务。<br>AI 生成内容基于公开语料的 RAG 检索，仅供传统文化学习、研究与哲学探讨参考。<br>命运掌握在自己手中，本平台不承诺任何超自然效果，不提供任何形式的迷信敛财、改运及医疗建议。</p>', unsafe_allow_html=True)

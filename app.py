@@ -907,37 +907,44 @@ if st.session_state.chart_data is not None:
 
     st.markdown("---")
 
-    # ── 反馈（填完后送3次对话）──
-    st.markdown("### 这个解读对你有用吗？")
-    fc1, fc2, fc3 = st.columns(3)
-    with fc1:
-        if st.button("有用", key="tianji_useful", use_container_width=True):
-            if st.session_state.user_id and st.session_state.chart_id:
-                save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=1)
-            if not st.session_state.feedback_done:
-                st.session_state.chat_bonus = 3
-                st.session_state.feedback_done = True
-            st.success("感谢反馈！已获得 3 次额外免费对话")
-    with fc2:
-        if st.button("不太准", key="tianji_not_useful", use_container_width=True):
-            if st.session_state.user_id and st.session_state.chart_id:
-                save_feedback(st.session_state.user_id, st.session_state.chart_id, useful=0)
-            if not st.session_state.feedback_done:
-                st.session_state.chat_bonus = 3
-                st.session_state.feedback_done = True
-            st.success("感谢反馈！已获得 3 次额外免费对话")
+    # ── 倪师的课后校验（V2 反馈）──
+    st.markdown("---")
+    st.markdown("""
+    <div style="background:rgba(196,168,112,0.08);border:1px solid rgba(196,168,112,0.2);border-radius:10px;padding:16px 18px;text-align:center;">
+    <p style="color:#c4a870;font-size:0.9rem;margin:0;">盘我看过了，刚才聊的这些，跟你目前的真实处境印证得如何？</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown('<p style="margin-top:16px;font-size:0.85rem;">如果可以无限量与倪师对话 + 解锁大限流年 + 合盘解读，你愿意付多少钱？</p>', unsafe_allow_html=True)
-    pcols = st.columns(4)
-    for i, price in enumerate(["19.9", "49.9", "99", "不愿意"]):
-        with pcols[i]:
-            if st.button(price, key=f"tianji_wtp_{i}", use_container_width=True):
-                if st.session_state.user_id and st.session_state.chart_id:
-                    save_feedback(st.session_state.user_id, st.session_state.chart_id, wtp=price)
-                if not st.session_state.feedback_done:
-                    st.session_state.chat_bonus = 3
-                    st.session_state.feedback_done = True
-                st.success("已记录，已获得 3 次额外免费对话")
+    rating = st.radio("", [
+        "🥠 铁口直断，完全命中",
+        "🤔 有些参考价值，但不全对",
+        "❌ 驴头不对马嘴"
+    ], index=None, key="fb_rating", horizontal=False)
+
+    if rating:
+        score = 5 if "铁口" in rating else (3 if "参考" in rating else 1)
+        tags = st.multiselect("哪些地方让你有这种感觉？（可多选）",
+            ["测算准","态度好","像真人","有代入感","逻辑清楚","有幻觉","重复废话","太笼统","口吻不对","其他"],
+            key="fb_tags")
+        text = st.text_area("如果觉得有偏差，是哪里不准？你说出来，我调整推演逻辑。",
+            placeholder="比如：感情宫说得不对，我其实是...", key="fb_text")
+
+        if st.button("提交反馈，再获 3 次对话", key="fb_submit", use_container_width=True):
+            if st.session_state.user_id and st.session_state.chart_id:
+                try:
+                    from storage import save_feedback_v2, claim_feedback_reward
+                    ok = save_feedback_v2(st.session_state.user_id, st.session_state.chart_id,
+                                          score, tags, text)
+                    if ok:
+                        if claim_feedback_reward(st.session_state.user_id, st.session_state.chart_id):
+                            st.session_state.chat_bonus += 3
+                        st.success("收到你的反馈了。我已调整推演逻辑，再送你 3 次对话。")
+                    else:
+                        st.info("你已经提交过反馈了，谢谢你的认真。")
+                except Exception:
+                    st.warning("反馈记录失败，但对话额度已赠送")
+
+    st.markdown('<p style="margin-top:16px;font-size:0.85rem;text-align:center;">想支持天纪持续进化？了解无限对话会员</p>', unsafe_allow_html=True)
 
     with st.expander("查看命盘数据"):
         st.json(chart_data)

@@ -171,6 +171,30 @@ def get_feedback_stats():
     return {"total": total, "useful": useful, "wtp": wtp_counts}
 
 
+# ═══════════════════════════════════ 反馈 V2 ═══════════════════════════════════
+
+def save_feedback_v2(user_id, chart_id, rating_score, tags=None, text=None):
+    try:
+        _req("POST", "/rest/v1/feedback", {
+            "user_id": user_id, "chart_id": chart_id,
+            "rating_score": rating_score,
+            "feedback_tags": json.dumps(tags or []),
+            "text_content": text,
+        })
+        return True
+    except RuntimeError:
+        return False
+
+
+def claim_feedback_reward(user_id, chart_id):
+    rows = _req("GET",
+        f"/rest/v1/feedback?select=id,reward_claimed&user_id=eq.{user_id}&chart_id=eq.{chart_id}&limit=1")
+    if not rows or rows[0].get("reward_claimed"):
+        return False
+    _req("PATCH", f"/rest/v1/feedback?id=eq.{rows[0]['id']}", {"reward_claimed": True})
+    return True
+
+
 # ═══════════════════════════════════ 统计 ═══════════════════════════════════
 
 def get_stats():

@@ -542,9 +542,10 @@ st.markdown("""
 
 for key in ["chart_data","reading","geju_list","name","chat_history",
             "true_h","true_m","zhi_idx","hour","minute","city","lon",
-            "user_id","chart_id","share_id","phone","logged_in"]:
+            "user_id","chart_id","share_id","phone","logged_in","page"]:
     if key not in st.session_state:
         st.session_state[key] = None if key != "chat_history" else []
+if st.session_state.page is None: st.session_state.page = "landing"
 if "chat_bonus" not in st.session_state: st.session_state.chat_bonus = 0
 if "feedback_done" not in st.session_state: st.session_state.feedback_done = False
 
@@ -588,7 +589,9 @@ st.markdown("""
 
 _, cta_col, _ = st.columns([1, 1.2, 1])
 with cta_col:
-    st.button("开启勘探", key="lp_cta", use_container_width=True)
+    if st.button("开启勘探", key="lp_cta", use_container_width=True):
+        st.session_state.page = "form"
+        st.rerun()
 
 st.markdown("---")
 
@@ -668,7 +671,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown("---")
+if st.session_state.page == "landing":
+    st.markdown("---")
+    st.stop()
 
 # 手机号登录
 phone_col, _ = st.columns([1, 2])
@@ -741,9 +746,13 @@ if submitted and name:
         st.session_state.minute = minute
         st.session_state.city = city
         st.session_state.lon = lon
+        st.session_state.page = "result"
         st.rerun()
     except Exception as e:
         st.error("出错了: " + str(e))
+
+if st.session_state.page == "form":
+    st.stop()
 
 if st.session_state.chart_data is not None:
     chart_data = st.session_state.chart_data

@@ -352,6 +352,41 @@ def generate_reading(chart_data, name, geju_list):
     return str(response.content[0])
 
 
+def generate_opening_chat(chart_data, name, geju_list):
+    """排盘后 AI 主动开场：性格底色 + 痛点悬念 + 引导提问"""
+    client = Anthropic(api_key=API_KEY, base_url=API_BASE)
+    rag_context = TIANJI_RAG.get_context_for_chart(chart_data, max_tokens=2000)
+    basic, geju_text, palace_text = build_chart_summary(chart_data, geju_list)
+    today = datetime.now().strftime("%Y年%m月%d日")
+
+    prompt = f"""当前日期：{today}。你是倪海夏。你刚看完 {name} 的紫微斗数命盘。现在你要用微信语音消息的口吻，主动对ta说出你的第一印象。
+
+规则：
+- 100字以内，口语化，像长辈第一次看你的盘
+- 说1个核心性格底色（引用命宫主星和落宫）
+- 抛1个悬念反问（让ta想继续聊下去，比如"是不是今年有...的感觉"）
+- 给3个快捷回复建议（让ta不用自己想问题）
+- 用 {name} 称呼对方
+
+命盘概要：
+{basic.get('性别','')} | {basic.get('阳历','')} | {basic.get('四柱','')}
+格局: {geju_text[:300]}
+命宫: {next((p for p in chart_data.get('命盘',[]) if p['宫位']=='命宫'), {})}
+
+输出格式（严格三行）：
+[开场白]
+[反问]
+[快捷回复1] | [快捷回复2] | [快捷回复3]"""
+
+    response = client.messages.create(
+        model=API_MODEL_FAST, max_tokens=300, temperature=0.6,
+        thinking={"type": "disabled"},
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text_blocks = [b.text for b in response.content if hasattr(b, 'text') and b.text]
+    return "\n".join(text_blocks) if text_blocks else f"{name}，我看完你的盘了。命宫坐{'命宫' if geju_list else '紫微'}，性格底色很鲜明。这些年是不是总觉得有些东西能成但又差那么一点？想听听倪师怎么看你的盘吗？\n聊聊事业 | 聊聊感情 | 聊聊财运"
+
+
 def generate_chat(chart_data, name, geju_list, user_question, chat_history=""):
     client = Anthropic(api_key=API_KEY, base_url=API_BASE)
 
@@ -740,6 +775,14 @@ if submitted and name:
         st.session_state.user_id = user_id
         st.session_state.chart_id = chart_id
         st.session_state.chat_history = load_chat_history(user_id, chart_id)
+        # 新命盘：AI 先说话
+        if len(st.session_state.chat_history) == 0:
+            opening = generate_opening_chat(chart_data, name, geju_list)
+            st.session_state.chat_history = [("倪师开场", opening)]
+            save_chat(user_id, chart_id, "倪师开场", opening)
+            st.session_state.has_opening = True
+        else:
+            st.session_state.has_opening = True
         st.session_state.true_h = true_h
         st.session_state.true_m = true_m
         st.session_state.zhi_idx = zhi_idx

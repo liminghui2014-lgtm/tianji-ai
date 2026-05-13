@@ -811,8 +811,16 @@ if st.session_state.chart_data is not None:
     city = st.session_state.city
     lon = st.session_state.lon
 
-    st.markdown("---")
-    st.markdown(f'<div style="text-align:center;padding:12px 0;"><span style="color:#c4a870;font-size:0.9rem;">{name}</span><span style="color:#8b7e6a;font-size:0.75rem;"> · 命盘解读</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align:center;padding:8px 0;"><span style="color:#c4a870;font-size:0.9rem;">{name}</span><span style="color:#8b7e6a;font-size:0.75rem;"> · 命盘解读</span></div>', unsafe_allow_html=True)
+
+    # ── 40/60 分屏：上半区 Tab（星盘+详批）──
+    top_container = st.container()
+    with top_container:
+        tab_a, tab_b = st.tabs(["星盘推演", "天纪详批"])
+        with tab_a:
+            render_star_chart(chart_data)
+        with tab_b:
+            st.markdown(reading)
 
     time_display = get_time_display(zhi_idx)
     mt_cols = st.columns(5)
